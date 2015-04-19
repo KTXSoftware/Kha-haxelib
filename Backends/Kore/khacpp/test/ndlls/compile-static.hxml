@@ -1,0 +1,4 @@
+-main Test
+-cpp scpp
+-D static_ndll
+-D no_shared_libs
