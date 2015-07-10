@@ -4,8 +4,8 @@
 	"license": "MIT",
 	"tags": ["cross", "game"],
 	"description": "Ultra portable game/media-app framework",
-	"version": "0.9.5",
-	"releasenote": "Added explicit Linux 64 support. Updated to revision bdc0d6dcad46ba5a89c08356d4fb664899fa8320.",
+	"version": "15.07",
+	"releasenote": "Updated to revision 77cf05b4ef41bf2f8d8e9e9321296e886f8d4b3f.",
 	"contributors": ["RobDangerous"],
 	"dependencies": { }
 }
