@@ -5,11 +5,21 @@ import js.html.CanvasElement;
 
 class Sys {
 	public static var gl: Dynamic;
-	public static var audio: Dynamic;
+	@:noCompletion public static var _hasWebAudio: Bool;
 	public static var screenRotation: ScreenRotation = ScreenRotation.RotationNone;
 	//public static var graphics(default, null): Graphics;
 	private static var theMouse: Mouse;
 	public static var khanvas: CanvasElement;
+	private static var performance: Dynamic;
+	
+	public static function initPerformanceTimer(): Void {
+		if (Browser.window.performance != null) {
+			performance = Browser.window.performance;
+		}
+		else {
+			performance = untyped __js__("window.Date");
+		}
+	}
 	
 	public static function init(canvas: CanvasElement): Void {
 		khanvas = canvas;
@@ -17,7 +27,7 @@ class Sys {
 	}
 	
 	public static function getTime(): Float {
-		return untyped __js__("Date.now()") / 1000;
+		return performance.now() / 1000;
 	}
 	
 	public static var mouse(get, null): Mouse;

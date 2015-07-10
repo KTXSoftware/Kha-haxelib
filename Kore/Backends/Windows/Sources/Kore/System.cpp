@@ -5,12 +5,19 @@
 #include <Kore/Input/Mouse.h>
 #include <Kore/Input/Gamepad.h>
 #include <Kore/Graphics/Graphics.h>
+
+#ifdef VR_RIFT 
+#include "Vr/VrInterface.h"
+#endif
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #include <shlobj.h>
 #include <exception>
 #include <XInput.h>
+
+
 
 using namespace Kore;
 
@@ -366,7 +373,11 @@ vec2i Kore::System::mousePos() {
 namespace {
 	HWND hwnd = nullptr;
 
+#ifdef VR_RIFT
+	const char* windowClassName = "ORT";
+#else
 	const char* windowClassName = "KoreWindow";
+#endif
 
 	void registerWindowClass(HINSTANCE hInstance) {
 		WNDCLASSEXA wc = { sizeof(WNDCLASSEXA), CS_CLASSDC, MsgProc, 0L, 0L, hInstance, LoadIcon(hInstance, MAKEINTRESOURCE(107)), nullptr /*LoadCursor(0, IDC_ARROW)*/, 0, 0, windowClassName, 0 };
@@ -376,7 +387,15 @@ namespace {
 
 void* Kore::System::createWindow() {
 	HINSTANCE inst = GetModuleHandleA(nullptr);
-	registerWindowClass(inst);
+	#ifdef VR_RIFT 
+		::registerWindowClass(inst);
+		::hwnd = (HWND) VrInterface::Init(inst);
+	#else 
+
+	
+	::registerWindowClass(inst);
+	
+
 
 	DWORD dwExStyle;
 	DWORD dwStyle;
@@ -411,6 +430,10 @@ void* Kore::System::createWindow() {
 	}
 	AdjustWindowRectEx(&WindowRect, dwStyle, FALSE, dwExStyle);		// Adjust Window To True Requested Size
 	hwnd = CreateWindowExA(dwExStyle, windowClassName, Kore::Application::the()->name(), WS_CLIPSIBLINGS | WS_CLIPCHILDREN | dwStyle, 100, 100, WindowRect.right - WindowRect.left, WindowRect.bottom - WindowRect.top, nullptr, nullptr, inst, nullptr);
+	
+	
+
+
 	if (Application::the()->fullscreen()) SetWindowPos(hwnd, nullptr, 0, 0, Application::the()->width(), Application::the()->height(), 0);
 	GetFocus();
 	::SetCursor(LoadCursor(0, IDC_ARROW));
@@ -429,6 +452,8 @@ void* Kore::System::createWindow() {
 		MoveWindow(hwnd, r.left, r.top, r.right - r.left + 1, r.bottom - r.top + 1, TRUE);
 	}
 
+	
+#endif
 	return hwnd;
 }
 
@@ -507,6 +532,20 @@ int Kore::System::screenWidth() {
 
 int Kore::System::screenHeight() {
 	return Application::the()->height();
+}
+
+int Kore::System::desktopWidth() {
+	RECT size;
+	const HWND desktop = GetDesktopWindow();
+	GetWindowRect(desktop, &size);
+	return size.right;
+}
+
+int Kore::System::desktopHeight() {
+	RECT size;
+	const HWND desktop = GetDesktopWindow();
+	GetWindowRect(desktop, &size);
+	return size.bottom;
 }
 
 const char* Kore::System::systemId() {

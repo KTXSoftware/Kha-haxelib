@@ -48,7 +48,7 @@ File.prototype.getFileId = function () {
 };
 
 File.prototype.isBuildFile = function () {
-	return this.filename.endsWith(".c") || this.filename.endsWith(".cpp") || this.filename.endsWith(".m") || this.filename.endsWith(".mm") || this.filename.endsWith(".cc") || this.filename.endsWith(".s");
+	return this.filename.endsWith(".c") || this.filename.endsWith(".cpp") || this.filename.endsWith(".m") || this.filename.endsWith(".mm") || this.filename.endsWith(".cc") || this.filename.endsWith(".s") || this.filename.endsWith('.metal');
 };
 
 File.prototype.getName = function () {
@@ -72,6 +72,7 @@ var Framework = function (name) {
 	this.name = name;
 	this.buildid = newId();
 	this.fileid = newId();
+	this.localPath = null;
 };
 
 Framework.prototype.toString = function () {
@@ -278,11 +279,21 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 	this.p("/* End PBXBuildFile section */");
 	this.p();
 	this.p("/* Begin PBXFileReference section */");
-	this.p(appFileId + " /* " + solution.getName() + ".app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = " + solution.getName() + ".app; sourceTree = BUILT_PRODUCTS_DIR; };", 2);
+	this.p(appFileId + " /* " + solution.getName() + ".app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \"" + solution.getName() + ".app\"; sourceTree = BUILT_PRODUCTS_DIR; };", 2);
 
 	for (var f in frameworks) {
 		var framework = frameworks[f];
-		if (framework.toString().endsWith('.framework')) this.p(framework.getFileId() + " /* " + framework.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = " + framework.toString() + "; path = System/Library/Frameworks/" + framework.toString() + "; sourceTree = SDKROOT; };", 2);
+		if (framework.toString().endsWith('.framework')) {
+			// Local framework - a directory is specified
+			if (contains(framework.toString(), '/')) {
+				framework.localPath = from.resolve(framework.toString()).toAbsolutePath().toString();
+				this.p(framework.getFileId() + " /* " + framework.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = " + framework.toString() + "; path = " + framework.localPath + "; sourceTree = \"<absolute>\"; };", 2);
+			}
+			// XCode framework
+			else {
+				this.p(framework.getFileId() + " /* " + framework.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = " + framework.toString() + "; path = System/Library/Frameworks/" + framework.toString() + "; sourceTree = SDKROOT; };", 2);
+			}
+		}
 		else if (framework.toString().endsWith('.dylib')) this.p(framework.getFileId() + " /* " + framework.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = compiled.mach-o.dylib; name = " + framework.toString() + "; path = usr/lib/" + framework.toString() + "; sourceTree = SDKROOT; };", 2);
 		else this.p(framework.getFileId() + " /* " + framework.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = " + framework.toString() + "; path = ../" + from.resolve(framework.toString()).toAbsolutePath().toString() + "; sourceTree = SDKROOT; };", 2);
 	}
@@ -290,6 +301,7 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 	for (var f in files) {
 		var file = files[f];
 		var filetype = "unknown";
+		var fileencoding = '';
 		if (file.getName().endsWith(".plist")) filetype = "text.plist.xml";
 		if (file.getName().endsWith(".h")) filetype = "sourcecode.c.h";
 		if (file.getName().endsWith(".m")) filetype = "sourcecode.c.objc";
@@ -298,7 +310,11 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 		if (file.getName().endsWith(".cc")) filetype = "sourcecode.c.cpp";
 		if (file.getName().endsWith(".mm")) filetype = "sourcecode.c.objcpp";
 		if (file.getName().endsWith(".s")) filetype = "sourcecode.asm";
-		this.p(file.getFileId() + " /* " + file.toString() + " */ = {isa = PBXFileReference; lastKnownFileType = " + filetype + "; name = \"" + file.getLastName() + "\"; path = \"" + from.resolve(file.toString()).toAbsolutePath().toString() + "\"; sourceTree = \"<group>\"; };", 2);
+		if (file.getName().endsWith('.metal')) {
+			filetype = 'sourcecode.metal';
+			fileencoding = 'fileEncoding = 4; ';
+		}
+		this.p(file.getFileId() + " /* " + file.toString() + " */ = {isa = PBXFileReference; " + fileencoding + "lastKnownFileType = " + filetype + "; name = \"" + file.getLastName() + "\"; path = \"" + from.resolve(file.toString()).toAbsolutePath().toString() + "\"; sourceTree = \"<group>\"; };", 2);
 	}
 	this.p(iconFileId + ' /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };', 2);
 	this.p("/* End PBXFileReference section */");
@@ -372,9 +388,9 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 			this.p(");", 3);
 			if (!contains(dir.getName(), '/')) {
 				this.p("path = ../;", 3);
-				this.p("name = " + dir.getLastName() + ";", 3);
+				this.p("name = \"" + dir.getLastName() + "\";", 3);
 			}
-			else this.p("name = " + dir.getLastName() + ";", 3);
+			else this.p("name = \"" + dir.getLastName() + "\";", 3);
 			this.p("sourceTree = \"<group>\";", 3);
 		this.p("};", 2);
 	}
@@ -393,8 +409,8 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 		this.p(");", 3);
 		this.p("dependencies = (", 3);
 		this.p(");", 3);
-		this.p("name = " + solution.getName() + ";", 3);
-		this.p("productName = " + solution.getName() + ";", 3);
+		this.p("name = \"" + solution.getName() + "\";", 3);
+		this.p("productName = \"" + solution.getName() + "\";", 3);
 		this.p("productReference = " + appFileId + " /* " + solution.getName() + ".app */;", 3);
 		this.p("productType = \"com.apple.product-type." + (solution.isCmd() ? "tool" : "application") + "\";", 3);
 	this.p("};", 2);
@@ -637,6 +653,14 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 			if (platform === Platform.OSX) {
 				this.p('COMBINE_HIDPI_IMAGES = YES;', 4);
 			}
+			this.p("FRAMEWORK_SEARCH_PATHS = (", 4);
+				this.p('"$(inherited)",', 5);
+				// Search paths to local frameworks
+				for (var f in frameworks) {
+					var framework = frameworks[f];
+					if (framework.localPath != null) this.p(framework.localPath.substr(0, framework.localPath.lastIndexOf('/')) + ",", 5);
+				}
+			this.p(");", 4);
 			this.p("HEADER_SEARCH_PATHS = (", 4);
 				this.p('"$(inherited)",', 5);
 				this.p('/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,', 5);
@@ -660,6 +684,14 @@ ExporterXCode.prototype.exportSolution = function (solution, from, to, platform)
 			if (platform === Platform.OSX) {
 				this.p('COMBINE_HIDPI_IMAGES = YES;', 4);
 			}
+			this.p("FRAMEWORK_SEARCH_PATHS = (", 4);
+				this.p('"$(inherited)",', 5);
+				// Search paths to local frameworks
+				for (var f in frameworks) {
+					var framework = frameworks[f];
+					if (framework.localPath != null) this.p(framework.localPath.substr(0, framework.localPath.lastIndexOf('/')) + ",", 5);
+				}
+			this.p(");", 4);
 			this.p("HEADER_SEARCH_PATHS = (", 4);
 				this.p('"$(inherited)",', 5);
 				this.p('/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,', 5);

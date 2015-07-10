@@ -10,6 +10,24 @@ import kha.Key;
 import kha.Loader;
 import kha.input.Sensor;
 import kha.input.SensorType;
+import kha.vr.VrInterface;
+
+#if ANDROID 
+	#if VR_CARDBOARD
+		import kha.kore.vr.CardboardVrInterface;
+	#end
+	#if !VR_CARDBOARD
+		import kha.kore.vr.VrInterface;
+	#end
+#end
+#if !ANDROID
+	#if VR_RIFT
+		import kha.kore.vr.VrInterfaceRift;
+	#end
+	#if !VR_RIFT
+		import kha.vr.VrInterfaceEmulated;
+	#end
+#end
 
 class Starter {
 	private var gameToStart: Game;
@@ -27,7 +45,9 @@ class Starter {
 		gamepad = new Gamepad();
 		surface = new Surface();
 		Sys.init();
-		Loader.init(new kha.cpp.Loader());
+		kha.audio2.Audio._init();
+		kha.audio1.Audio._init();
+		Loader.init(new kha.kore.Loader());
 		Scheduler.init();
 	}
 	
@@ -38,20 +58,62 @@ class Starter {
 	}
 	
 	public function loadFinished() {
+		trace("Starter.hx: Load finished");
 		Loader.the.initProject();
 		gameToStart.width = Loader.the.width;
 		gameToStart.height = Loader.the.height;
 		Configuration.setScreen(gameToStart);
 		Configuration.screen().setInstance();
 		Scheduler.start();
+		
+		
+		
+		#if ANDROID
+			#if VR_GEAR_VR
+				kha.vr.VrInterface.instance = new kha.kore.vr.VrInterface();
+			#end
+			#if !VR_GEAR_VR
+				kha.vr.VrInterface.instance = new CardboardVrInterface();
+			#end
+		#end
+        #if !ANDROID
+			#if VR_RIFT
+				kha.vr.VrInterface.instance = new VrInterfaceRift();
+			#end
+			#if !VR_RIFT
+				kha.vr.VrInterface.instance = new kha.vr.VrInterfaceEmulated();
+			#end
+		#end
+		
+		trace("Calling gameToStart.loadFinished()");
 		gameToStart.loadFinished();
-		var g4 = new kha.cpp.graphics4.Graphics();
-		framebuffer = new Framebuffer(null, g4);
-		framebuffer.init(new kha.cpp.graphics4.Graphics2(framebuffer), g4);
+
+		
+		#if !VR_GEAR_VR
+		#if !VR_RIFT
+		var g4 = new kha.kore.graphics4.Graphics();
+		framebuffer = new Framebuffer(null, null, g4);
+		framebuffer.init(new kha.graphics2.Graphics1(framebuffer), new kha.kore.graphics4.Graphics2(framebuffer), g4);
+		
+		#end
+		#end
+		
+		
 	}
 
 	public static function frame() {
-		if (framebuffer == null) return;
+		#if !ANDROID
+		#if !VR_RIFT
+			if (framebuffer == null) return;
+			var vrInterface: VrInterfaceEmulated = cast(VrInterface.instance, VrInterfaceEmulated);
+			vrInterface.framebuffer = framebuffer;
+		#end
+		#else 
+			#if VR_CARDBOARD
+				var vrInterface: CardboardVrInterface = cast(VrInterface.instance, CardboardVrInterface);
+				vrInterface.framebuffer = framebuffer;
+			#end
+		#end
 		Scheduler.executeFrame();
 		Game.the.render(framebuffer);
 	}

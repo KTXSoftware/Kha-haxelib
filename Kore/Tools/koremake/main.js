@@ -1,14 +1,16 @@
 var child_process = require('child_process');
+var fs = require('fs');
 var os = require('os');
+var path = require('path');
 var log = require('./log.js');
 var Files = require('./Files.js');
 var GraphicsApi = require('./GraphicsApi.js');
 var Options = require('./Options.js');
-var Path = require('./Path.js');
 var Paths = require('./Paths.js');
 var Project = require('./Project.js');
 var Platform = require('./Platform.js');
 var Solution = require('./Solution.js');
+var exec = require('./exec.js');
 var VisualStudioVersion = require('./VisualStudioVersion.js');
 var ExporterAndroid = require('./ExporterAndroid.js');
 var ExporterCodeBlocks = require('./ExporterCodeBlocks.js');
@@ -17,7 +19,7 @@ var ExporterEmscripten = require('./ExporterEmscripten.js');
 var ExporterTizen = require('./ExporterTizen.js');
 var ExporterVisualStudio = require('./ExporterVisualStudio.js');
 var ExporterXCode = require('./ExporterXCode.js');
-	
+
 if (!String.prototype.startsWith) {
 	Object.defineProperty(String.prototype, 'startsWith', {
 		enumerable: false,
@@ -96,6 +98,8 @@ function shaderLang(platform) {
 					return "d3d9";
 				case GraphicsApi.Direct3D11:
 					return "d3d11";
+				case GraphicsApi.Direct3D12:
+					return 'd3d12';
 				default:
 					return "d3d9";
 			}
@@ -104,7 +108,12 @@ function shaderLang(platform) {
 		case Platform.PlayStation3:
 			return "d3d9";
 		case Platform.iOS:
-			return "essl";
+			switch (Options.graphicsApi) {
+				case GraphicsApi.Metal:
+					return 'metal';
+				default:
+					return 'essl';
+			}
 		case Platform.OSX:
 			return "glsl";
 		case Platform.Android:
@@ -122,31 +131,20 @@ function shaderLang(platform) {
 	}
 }
 
-function compileShader(type, from, to, temp) {
+function compileShader(type, from, to, temp, platform) {
 	if (Project.koreDir.path !== '') {
-		if (os.platform() === "linux") {
-			var path = Project.koreDir.resolve(Paths.get("Tools", "kfx", "kfx-linux"));
-		}
-		else if (os.platform() === "win32") {
-			var path = Project.koreDir.resolve(Paths.get("Tools", "kfx", "kfx.exe"));
-		}
-		else {
-			var path = Project.koreDir.resolve(Paths.get("Tools", "kfx", "kfx-osx"));
-		}
-		child_process.spawn(path.toString(), [type, from, to, temp]);
+		var path = Project.koreDir.resolve(Paths.get("Tools", "krafix", "krafix" + exec.sys()));
+		child_process.spawnSync(path.toString(), [type, from, to, temp, platform]);
 	}
 }
 
 function exportKakeProject(from, to, platform, options) {
 	log.info("korefile found, generating build files.");
-	log.info("Generating " + fromPlatform(platform) + " solution");
+	log.info("Generating " + fromPlatform(platform) + " solution.");
 
 	var solution = Solution.create(from, platform);
-	log.info(".");
 	solution.searchFiles();
-	log.info(".");
 	solution.flatten();
-	log.info(".");
 
 	if (!Files.exists(to)) Files.createDirectories(to);
 
@@ -159,7 +157,7 @@ function exportKakeProject(from, to, platform, options) {
 			var index = outfile.lastIndexOf('/');
 			if (index > 0) outfile = outfile.substr(index);
 			outfile = outfile.substr(0, outfile.length - 5);
-			compileShader(shaderLang(platform), file, project.getDebugDir() + "/" + outfile, "build");
+			compileShader(shaderLang(platform), file, path.join(project.getDebugDir(), outfile), "build", platform);
 		}
 	}
 
@@ -172,10 +170,37 @@ function exportKakeProject(from, to, platform, options) {
 		else exporter = new ExporterCodeBlocks();
 	}
 	else if (platform == Platform.Tizen) exporter = new ExporterTizen();
-	else exporter = new ExporterVisualStudio();
-	exporter.exportSolution(solution, from, to, platform);
+	else {
+		var found = false;
+		for (var p in Platform) {
+			if (platform === Platform[p]) {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			exporter = new ExporterVisualStudio();
+		}
+		else {
+			var libdirs = fs.readdirSync(path.join(from.toString(), 'Libraries'));
+			for (var ld in libdirs) {
+				var libdir = libdirs[ld];
+				if (fs.statSync(path.join(from.toString(), 'Libraries', libdir)).isDirectory()) {
+					var libfiles = fs.readdirSync(path.join(from.toString(), 'Libraries', libdir));
+					for (var lf in libfiles) {
+						var libfile = libfiles[lf];
+						if (libfile.startsWith('Exporter') && libfile.endsWith('.js')) {
+							var Exporter = require(path.relative(__dirname, path.join(from.toString(), 'Libraries', libdir, libfile)));
+							exporter = new Exporter();
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+	exporter.exportSolution(solution, from, to, platform, options.vrApi);
 
-	log.info(".done.");
 	return solution.getName();
 }
 
@@ -206,23 +231,50 @@ exports.run = function (options, loglog, callback) {
 		Options.visualStudioVersion = options.visualStudioVersion;
 	}
 	
-	exportProject(Paths.get(options.from), Paths.get(options.to), options.platform, options);
+	if (options.vrApi !== undefined) {
+    	Options.vrApi = options.vrApi;
+	}
+	
+	var solutionName = exportProject(Paths.get(options.from), Paths.get(options.to), options.platform, options);
 
-	if (options.platform === Platform.Linux && options.compile) {
+	if (options.compile && solutionName != "") {
 		log.info('Compiling...');
-		var make = child_process.spawn('make', [], { cwd: options.to });
 
-		make.stdout.on('data', function (data) {
-			log.info(data.toString());
-		});
+		var make = null;
 
-		make.stderr.on('data', function (data) {
-			log.error(data.toString());
-		});
+		if (options.platform === Platform.Linux) {
+			make = child_process.spawn('make', [], { cwd: options.to });
+		}
+		else if (options.platform == Platform.OSX) {
+			make = child_process.spawn('xcodebuild', ['-project', solutionName + '.xcodeproj'], { cwd: options.to });
+		}
 
-		make.on('close', function (code) {
+		if (make != null) {
+			make.stdout.on('data', function (data) {
+				log.info(data.toString());
+			});
+
+			make.stderr.on('data', function (data) {
+				log.error(data.toString());
+			});
+
+			make.on('close', function (code) {
+				if (options.run) {
+					if (options.platform == Platform.OSX) {
+						child_process.spawn('open', ['build/Release/' + solutionName + '.app/Contents/MacOS/' + solutionName], { cwd: options.to });
+					}
+					else {
+						log.info('--run not yet implemented for this platform');
+					}
+				}
+
+				callback();
+			});
+		}
+		else {
+			log.info('--compile not yet implemented for this platform');
 			callback();
-		});
+		}
 	}
 	else callback();
 };

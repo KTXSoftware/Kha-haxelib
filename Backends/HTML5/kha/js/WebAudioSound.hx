@@ -1,9 +1,16 @@
 package kha.js;
 
+import haxe.ds.Vector;
+import haxe.io.Bytes;
+import haxe.io.BytesOutput;
 import js.Browser;
+import js.html.ArrayBuffer;
+import js.html.audio.AudioBuffer;
 import js.html.AudioElement;
 import js.html.XMLHttpRequest;
 import js.Lib;
+import kha.audio2.Audio;
+import kha.audio2.ogg.vorbis.Reader;
 
 class WebAudioChannel extends kha.SoundChannel {
 	private var buffer: Dynamic;
@@ -15,23 +22,23 @@ class WebAudioChannel extends kha.SoundChannel {
 		super();
 		this.offset = 0;
 		this.buffer = buffer;
-		this.startTime = Sys.audio.currentTime;
-		this.source = Sys.audio.createBufferSource();
+		this.startTime = Audio._context.currentTime;
+		this.source = Audio._context.createBufferSource();
 		this.source.buffer = this.buffer;
-		this.source.connect(Sys.audio.destination);
+		this.source.connect(Audio._context.destination);
 		this.source.start(0);
 	}
 	
 	override public function play(): Void {
 		if (source != null) return;
 		super.play();
-		startTime = Sys.audio.currentTime - offset;
+		startTime = Audio._context.currentTime - offset;
 		source.start(0, offset);
 	}
 	
 	override public function pause(): Void {
 		source.stop();
-		offset = Sys.audio.currentTime - startTime;
+		offset = Audio._context.currentTime - startTime;
 		startTime = -1;
 		source = null;
 	}
@@ -46,7 +53,7 @@ class WebAudioChannel extends kha.SoundChannel {
 	
 	override public function getCurrentPos(): Int {
 		if (startTime < 0) return Math.ceil(offset * 1000);
-		else return Math.ceil((Sys.audio.currentTime - startTime) * 1000); //Miliseconds
+		else return Math.ceil((Audio._context.currentTime - startTime) * 1000); //Miliseconds
 	}
 	
 	override public function getLength(): Int {
@@ -56,46 +63,46 @@ class WebAudioChannel extends kha.SoundChannel {
 
 class WebAudioSound extends kha.Sound {
 	private var done: kha.Sound -> Void;
-	private var buffer: Dynamic;
-	private static var initialized: Bool = false;
-	private static var playsOgg: Bool = false;
-	
-	private static function init(): Void {
-		if (initialized) return;
-		var element: AudioElement = cast Browser.document.createElement("audio");
-		playsOgg = element.canPlayType("audio/ogg") != "";
-		initialized = true;
-	}
+	private var buffer: AudioBuffer;
 	
 	public function new(filename: String, done: kha.Sound -> Void) {
 		super();
 		this.done = done;
 		
-		init();
-		
 		var request = untyped new XMLHttpRequest();
-		request.open("GET", filename + (playsOgg ? ".ogg" : ".mp4"), true);
+		request.open("GET", filename + ".ogg", true);
 		request.responseType = "arraybuffer";
 		
 		request.onerror = function() {
-			Browser.alert("loadSound failed");
+			Browser.console.log("loadSound failed");
 		};
 		request.onload = function() {
-			var arrayBuffer = request.response;
-			Sys.audio.decodeAudioData(request.response,
-			function(buf) {
-				buffer = buf;
-				done(this);
-			},
-			function() {
-				Browser.alert("loadSound failed");
+			var arrayBuffer: ArrayBuffer = request.response;
+			
+			var output = new BytesOutput();
+			var header = Reader.readAll(Bytes.ofData(arrayBuffer), output, true);
+			var soundBytes = output.getBytes();
+			var count = Std.int(soundBytes.length / 4);
+			if (header.channel == 1) {
+				data = new Vector<Float>(count * 2);
+				for (i in 0...count) {
+					data[i * 2 + 0] = soundBytes.getFloat(i * 4);
+					data[i * 2 + 1] = soundBytes.getFloat(i * 4);
+				}
 			}
-			);
+			else {
+				data = new Vector<Float>(count);
+				for (i in 0...count) {
+					data[i] = soundBytes.getFloat(i * 4);
+				}
+			}
+			
+			done(this);
 		};
 		request.send(null);
 	}
 	
-	override public function play(): kha.SoundChannel {
-		return new WebAudioChannel(buffer);
-	}
+	//override public function play(): kha.SoundChannel {
+	//	return new WebAudioChannel(buffer);
+	//}
 }

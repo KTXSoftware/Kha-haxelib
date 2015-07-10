@@ -4,8 +4,8 @@
 #include <time.h>
 
 #ifdef HX_WINRT
-using namespace Windows::Foundation;
-using namespace Windows::System::Threading;
+//using namespace Windows::Foundation;
+//using namespace Windows::System::Threading;
 #endif
 
 DECLARE_TLS_DATA(class hxThreadInfo, tlsCurrentThread);
@@ -267,7 +267,12 @@ THREAD_FUNC_TYPE hxThreadFunc( void *inInfo )
 }
 
 
-
+#ifdef HX_WINRT
+Dynamic __hxcpp_thread_create(Dynamic inStart)
+{
+	return hx::Throw(HX_CSTRING("Threads are not yet supported on WinRT"));
+}
+#else
 Dynamic __hxcpp_thread_create(Dynamic inStart)
 {
     #ifdef EMSCRIPTEN
@@ -284,6 +289,7 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
 
    #if defined(HX_WINRT)
 
+   bool ok = true;
    try
    {
      auto workItemHandler = ref new WorkItemHandler([=](IAsyncAction^)
@@ -296,6 +302,7 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
    }
    catch (...)
    {
+      ok = false;
    }
 
    #elif defined(HX_WINDOWS)
@@ -322,6 +329,37 @@ Dynamic __hxcpp_thread_create(Dynamic inStart)
        throw Dynamic( HX_CSTRING("Could not create thread") );
     return info;
     #endif
+}
+#endif
+
+void __hxcpp_register_current_thread()
+{
+	g_threadInfoMutex.Lock();
+	int threadNumber = g_nextThreadNumber++;
+	g_threadInfoMutex.Unlock();
+
+	hxThreadInfo *inInfo = new hxThreadInfo((void*)NULL, threadNumber);
+
+	hx::GCPrepareMultiThreaded();
+	//hx::EnterGCFreeZone();
+
+	hxThreadInfo *info[2];
+	info[0] = (hxThreadInfo *)inInfo;
+	info[1] = 0;
+
+	hx::RegisterCurrentThread((int *)&info[1]);
+
+	tlsCurrentThread = info[0];
+
+	// Release the creation function
+	info[0]->mSemaphore->Set();
+
+	// Call the debugger function to annouce that a thread has been created
+	__hxcpp_dbg_threadCreatedOrTerminated(info[0]->GetThreadNumber(), true);
+
+	inInfo->mSemaphore->Wait();
+	//hx::ExitGCFreeZone();
+	inInfo->CleanSemaphore();
 }
 
 static hx::Object *sMainThreadInfo = 0;

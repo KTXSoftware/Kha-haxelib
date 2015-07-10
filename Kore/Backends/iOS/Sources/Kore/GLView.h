@@ -14,6 +14,9 @@
 #ifdef SYS_METAL
 	id <MTLDevice> device;
 	id <MTLCommandQueue> commandQueue;
+	id <MTLCommandBuffer> commandBuffer;
+	id <MTLRenderCommandEncoder> commandEncoder;
+	id <CAMetalDrawable> drawable;
 	id <MTLLibrary> library;
 	MTLRenderPassDescriptor* renderPassDescriptor;
 #else
@@ -30,5 +33,10 @@
 - (void)end;
 - (void)showKeyboard;
 - (void)hideKeyboard;
+#ifdef SYS_METAL
+- (id <MTLDevice>)metalDevice;
+- (id <MTLLibrary>)metalLibrary;
+- (id <MTLRenderCommandEncoder>)metalEncoder;
+#endif
 
 @end

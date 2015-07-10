@@ -1,5 +1,8 @@
 package kha;
 
+/**
+ * List of special Keyboard keys.
+ */
 enum Key {
 	BACKSPACE;
 	TAB;

@@ -34,7 +34,9 @@ static void *sgObject_root = 0;
 int gInAlloc = false;
 
 #if HX_HAS_ATOMIC
-  #if defined(HX_MACOS) || defined(HX_WINDOWS) || defined(HX_LINUX)
+  #if defined(HX_WINRT)
+  enum { MAX_MARK_THREADS = 1 };
+  #elif defined(HX_MACOS) || defined(HX_WINDOWS) || defined(HX_LINUX)
   enum { MAX_MARK_THREADS = 4 };
   #else
   enum { MAX_MARK_THREADS = 2 };
@@ -2333,8 +2335,8 @@ public:
 
    int Collect(bool inMajor, bool inForceCompact)
    {
-      #ifdef DEBUG
-      //sgAllocsSinceLastSpam = 0;
+      #ifdef HXCPP_DEBUG
+      sgAllocsSinceLastSpam = 0;
       #endif
 
       HX_STACK_FRAME("GC", "collect", 0, "GC::collect", __FILE__, __LINE__,0)

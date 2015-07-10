@@ -68,7 +68,7 @@ class Sound extends kha.Sound {
 		this.done = done;
 		loading.add(this); // prevent gc from removing this
 		
-		element = cast Browser.document.createElement("audio");
+		element = Browser.document.createAudioElement();
 		
 		if (extensions == null) {
 			extensions = new Array<String>();
@@ -84,15 +84,15 @@ class Sound extends kha.Sound {
 		element.load();
 	}
 	
-	override public function play(): kha.SoundChannel {
-		try {
-			element.play();
-		}
-		catch (e: Dynamic) {
-			trace(e);
-		}
-		return new SoundChannel(element);
-	}
+	//override public function play(): kha.SoundChannel {
+	//	try {
+	//		element.play();
+	//	}
+	//	catch (e: Dynamic) {
+	//		trace(e);
+	//	}
+	//	return new SoundChannel(element);
+	//}
 	
 	private function errorListener(eventInfo: ErrorEvent): Void {
 		if (element.error.code == MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
@@ -106,7 +106,7 @@ class Sound extends kha.Sound {
 		}
 		
 		trace("Error loading " + extractName(element.src) + concatExtensions());
-		Browser.alert("loadSound failed");
+		Browser.console.log("loadSound failed");
 	
 		finishAsset();
 	}

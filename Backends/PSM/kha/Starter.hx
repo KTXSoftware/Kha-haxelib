@@ -1,8 +1,11 @@
 package kha;
 
+import kha.graphics4.Graphics2;
+import kha.psm.graphics4.Graphics;
+
 class Starter {
 	static public var game: Game;
-	static public var painter: kha.psm.Painter;
+	private static var framebuffer: Framebuffer;
 	static var left: Bool;
 	static var right: Bool;
 	static var up: Bool;
@@ -12,13 +15,17 @@ class Starter {
 	public static var mouseY: Int = 0;
 	
 	public function new() {
-		painter = new kha.psm.Painter();
-		kha.Loader.init(new kha.psm.Loader());
-		Scheduler.init();
 		left = false;
 		right = false;
 		up = false;
 		down = false;
+		
+		new kha.input.Keyboard();
+		new kha.input.Mouse();
+		//gamepad = new Gamepad();
+		
+		Loader.init(new kha.psm.Loader());
+		Scheduler.init();
 	}
 	
 	public function start(game: Game) {
@@ -27,20 +34,27 @@ class Starter {
 		Loader.the.loadProject(loadFinished);
 	}
 	
-	public static function loadFinished(): Void {
+	public function loadFinished(): Void {
 		Loader.the.initProject();
 		game.width = Loader.the.width;
 		game.height = Loader.the.height;
+		Sys.init();
+		
+		var graphics = new Graphics();
+		framebuffer = new Framebuffer(null, null, graphics);
+		var g1 = new kha.graphics2.Graphics1(framebuffer);
+		var g2 = new Graphics2(framebuffer);
+		framebuffer.init(g1, g2, graphics);
+		
+		Scheduler.start();
 		Configuration.setScreen(game);
 		Configuration.screen().setInstance();
 		game.loadFinished();
 		while (true) {
 			checkEvents();
 			checkGamepad();
-			game.update();
-			painter.begin();
-			game.render(painter);
-			painter.end();
+			Scheduler.executeFrame();
+			game.render(framebuffer);
 		}
 	}
 	
@@ -49,48 +63,56 @@ class Starter {
 		if ((gamePadData.Buttons & Sce.PlayStation.Core.Input.GamePadButtons.Left) != 0) {
 			if (!left) {
 				game.buttonDown(Button.LEFT);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendDownEvent(kha.Key.LEFT, "");
 				left = true;
 			}
 		}
 		else {
 			if (left) {
 				game.buttonUp(Button.LEFT);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendUpEvent(kha.Key.LEFT, "");
 				left = false;
 			}
 		}
 		if ((gamePadData.Buttons & Sce.PlayStation.Core.Input.GamePadButtons.Right) != 0) {
 			if (!right) {
 				game.buttonDown(Button.RIGHT);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendDownEvent(kha.Key.RIGHT, "");
 				right = true;
 			}
 		}
 		else {
 			if (right) {
 				game.buttonUp(Button.RIGHT);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendUpEvent(kha.Key.RIGHT, "");
 				right = false;
 			}
 		}
 		if ((gamePadData.Buttons & Sce.PlayStation.Core.Input.GamePadButtons.Up) != 0) {
 			if (!up) {
 				game.buttonDown(Button.UP);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendDownEvent(kha.Key.UP, "");
 				up = true;
 			}
 		}
 		else {
 			if (up) {
 				game.buttonUp(Button.UP);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendUpEvent(kha.Key.UP, "");
 				up = false;
 			}
 		}
 		if ((gamePadData.Buttons & Sce.PlayStation.Core.Input.GamePadButtons.Down) != 0) {
 			if (!down) {
 				game.buttonDown(Button.DOWN);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendDownEvent(kha.Key.DOWN, "");
 				down = true;
 			}
 		}
 		else {
 			if (down) {
 				game.buttonUp(Button.DOWN);
+				kha.input.Keyboard.get(new haxe.lang.Null<int>(0, true)).sendUpEvent(kha.Key.DOWN, "");
 				down = false;
 			}
 		}

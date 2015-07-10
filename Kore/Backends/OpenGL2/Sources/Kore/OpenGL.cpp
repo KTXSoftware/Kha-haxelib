@@ -22,6 +22,12 @@
 
 using namespace Kore;
 
+namespace Kore {
+#if !defined(SYS_IOS) && !defined(SYS_ANDROID)
+	extern bool programUsesTesselation;
+#endif
+}
+
 namespace {
 #ifdef SYS_WINDOWS
 	HINSTANCE instance = 0;
@@ -61,6 +67,7 @@ void Graphics::init() {
 #ifdef SYS_WINDOWS
 	windowHandle = (HWND)System::createWindow();
 
+#ifndef VR_RIFT
 	PIXELFORMATDESCRIPTOR pfd =					// pfd Tells Windows How We Want Things To Be
 	{
 		sizeof(PIXELFORMATDESCRIPTOR),					// Size Of This Pixel Format Descriptor
@@ -93,7 +100,7 @@ void Graphics::init() {
 
 	if (wglewIsSupported("WGL_ARB_create_context") == 1) {
 		int attributes[] = {
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
 			WGL_CONTEXT_MINOR_VERSION_ARB, 2,
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
@@ -111,10 +118,18 @@ void Graphics::init() {
 	ShowWindow(windowHandle, SW_SHOW);
 	SetForegroundWindow(windowHandle); // Slightly Higher Priority
 	SetFocus(windowHandle); // Sets Keyboard Focus To The Window
+#else 
+	deviceContext = GetDC(windowHandle);
+	glContext = wglGetCurrentContext();
+	glewInit();
+	
+
+#endif
 #else
 	System::createWindow();
 #endif
 	
+#ifndef VR_RIFT
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	setRenderState(DepthTest, false);
@@ -125,6 +140,7 @@ void Graphics::init() {
 		minFilters[i] = LinearFilter;
 		mipFilters[i] = NoMipFilter;
 	}
+#endif
 
 #ifdef SYS_WINDOWS
 	if (wglSwapIntervalEXT != nullptr) wglSwapIntervalEXT(1);
@@ -188,10 +204,19 @@ void Graphics::drawIndexedVertices() {
 }
 
 void Graphics::drawIndexedVertices(int start, int count) {
+#ifdef OPENGLES
 #ifdef SYS_ANDROID
 	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, 0);
 #else
 	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);
+#endif
+#else
+	if (programUsesTesselation) {
+		glDrawElements(GL_PATCHES, count, GL_UNSIGNED_INT, 0);
+	}
+	else {
+		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);
+	}	
 #endif
 }
 
@@ -213,11 +238,14 @@ void Graphics::begin() {
 #endif
 #ifdef SYS_ANDROID
 	// if rendered to a texture, strange things happen if the backbuffer is not cleared
+	glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 #endif
 }
 
 void Graphics::end() {
+	//glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
+	//glClear(GL_COLOR_BUFFER_BIT);
 	GLenum code = glGetError();
 	while (code != GL_NO_ERROR) {
 		//std::printf("GLError: %s\n", gluErrorString(code));
@@ -490,4 +518,8 @@ bool Graphics::renderTargetsInvertedY() {
 
 bool Graphics::nonPow2TexturesSupported() {
 	return false;
+}
+
+void Graphics::flush() {
+	glFlush();
 }

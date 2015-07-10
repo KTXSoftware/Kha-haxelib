@@ -25,6 +25,11 @@ if (platform === Platform.Windows) {
 		addBackend('Direct3D11');
 		project.addDefine('DIRECT3D');
 	}
+	else if (graphics === GraphicsApi.Direct3D12) {
+		addBackend('Direct3D12');
+		project.addDefine('DIRECT3D');
+		project.addLib('dxgi');
+	}
 	else {
 		addBackend('Direct3D9');
 		project.addDefine('DIRECT3D');
@@ -33,7 +38,10 @@ if (platform === Platform.Windows) {
 	project.addLibsFor('Win32', 'Backends/Windows/Libraries/directx/Lib/x86/dxguid', 'Backends/Windows/Libraries/directx/Lib/x86/DxErr', 'Backends/Windows/Libraries/directx/Lib/x86/dsound', 'Backends/Windows/Libraries/directx/Lib/x86/XInput', 'Backends/Windows/Libraries/directx/Lib/x86/dinput8');
 	project.addLibsFor('x64', 'Backends/Windows/Libraries/directx/Lib/x64/dxguid', 'Backends/Windows/Libraries/directx/Lib/x64/DxErr', 'Backends/Windows/Libraries/directx/Lib/x64/dsound', 'Backends/Windows/Libraries/directx/Lib/x64/XInput');
 	if (graphics !== GraphicsApi.OpenGL) {
-		if (graphics === GraphicsApi.Direct3D11) {
+		if (graphics === GraphicsApi.Direct3D12) {
+			project.addLib('d3d12');
+		}
+		else if (graphics === GraphicsApi.Direct3D11) {
 			project.addLibFor('Win32', 'Backends/Windows/Libraries/directx/Lib/x86/d3d11');
 			project.addLibFor('x64', 'Backends/Windows/Libraries/directx/Lib/x64/d3d11');
 		}
@@ -46,8 +54,8 @@ if (platform === Platform.Windows) {
 	project.addDefine('_WINSOCK_DEPRECATED_NO_WARNINGS');
 	project.addLib('ws2_32');
 }
-else if (platform === Platform.WindowsRT) {
-	addBackend('WindowsRT');
+else if (platform === Platform.WindowsApp) {
+	addBackend('WindowsApp');
 	addBackend('Direct3D11');
 }
 else if (platform === Platform.Xbox360) {
@@ -68,6 +76,7 @@ else if (platform === Platform.OSX) {
 	project.addLib('CoreData');
 	project.addLib('Foundation');
 	project.addLib('OpenGL');
+	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.iOS) {
 	addBackend('iOS');
@@ -92,11 +101,14 @@ else if (platform === Platform.iOS) {
 	project.addLib('CoreFoundation');
 	project.addLib('CoreVideo');
 	project.addLib('CoreMedia');
+	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.Android) {
 	addBackend('Android');
 	addBackend('OpenGL2');
 	project.addDefine('OPENGL');
+	project.addDefine('SYS_ANDROID_API=15');
+	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.HTML5) {
 	addBackend('HTML5');
@@ -108,12 +120,18 @@ else if (platform === Platform.Linux) {
 	addBackend('Linux');
 	addBackend('OpenGL2');
 	project.addDefine('OPENGL');
+	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.Tizen) {
 	addBackend('Tizen');
 	addBackend('OpenGL2');
 	project.addExclude('Backends/OpenGL2/Sources/GL/**');
 	project.addDefine('OPENGL');
+	project.addDefine('SYS_UNIXOID');
+}
+
+if (platform !== Platform.Android) {
+	project.addExclude('Sources/Kore/IO/miniz.cpp')
 }
 
 return project;

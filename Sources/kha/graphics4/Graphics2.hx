@@ -1,5 +1,6 @@
 package kha.graphics4;
 
+import haxe.io.Float32Array;
 import kha.Canvas;
 import kha.Color;
 import kha.Font;
@@ -27,11 +28,11 @@ class ImageShaderPainter {
 	private var structure: VertexStructure;
 	private var projectionLocation: ConstantLocation;
 	private var textureLocation: TextureUnit;
-	private static var bufferSize: Int = 100;
+	private static var bufferSize: Int = 1500;
 	private static var vertexSize: Int = 9;
 	private var bufferIndex: Int;
 	private var rectVertexBuffer: VertexBuffer;
-    private var rectVertices: Array<Float>;
+    private var rectVertices: Float32Array;
 	private var indexBuffer: IndexBuffer;
 	private var lastTexture: Image;
 	private var bilinear: Bool = false;
@@ -104,7 +105,7 @@ class ImageShaderPainter {
 		indexBuffer.unlock();
 	}
 	
-	private function setRectVertices(
+	private inline function setRectVertices(
 		bottomleftx: Float, bottomlefty: Float,
 		topleftx: Float, toplefty: Float,
 		toprightx: Float, toprighty: Float,
@@ -127,7 +128,7 @@ class ImageShaderPainter {
 		rectVertices[baseIndex + 29] = -5.0;
 	}
 	
-	private function setRectTexCoords(left: Float, top: Float, right: Float, bottom: Float): Void {
+	private inline function setRectTexCoords(left: Float, top: Float, right: Float, bottom: Float): Void {
 		var baseIndex: Int = bufferIndex * vertexSize * 4;
 		rectVertices[baseIndex +  3] = left;
 		rectVertices[baseIndex +  4] = bottom;
@@ -142,7 +143,7 @@ class ImageShaderPainter {
 		rectVertices[baseIndex + 31] = bottom;
 	}
 	
-	private function setRectColor(r: Float, g: Float, b: Float, a: Float): Void {
+	private inline function setRectColor(r: Float, g: Float, b: Float, a: Float): Void {
 		var baseIndex: Int = bufferIndex * vertexSize * 4;
 		rectVertices[baseIndex +  5] = r;
 		rectVertices[baseIndex +  6] = g;
@@ -184,6 +185,7 @@ class ImageShaderPainter {
 
 		g.setTexture(textureLocation, null);
 		bufferIndex = 0;
+		rectVertices = rectVertexBuffer.lock();
 	}
 	
 	public function setBilinearFilter(bilinear: Bool): Void {
@@ -191,7 +193,7 @@ class ImageShaderPainter {
 		this.bilinear = bilinear;
 	}
 	
-	public function drawImage(img: kha.Image,
+	public inline function drawImage(img: kha.Image,
 		bottomleftx: Float, bottomlefty: Float,
 		topleftx: Float, toplefty: Float,
 		toprightx: Float, toprighty: Float,
@@ -208,7 +210,7 @@ class ImageShaderPainter {
 		lastTexture = tex;
 	}
 	
-	public function drawImage2(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float,
+	public inline function drawImage2(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float,
 		bottomleftx: Float, bottomlefty: Float,
 		topleftx: Float, toplefty: Float,
 		toprightx: Float, toprighty: Float,
@@ -225,7 +227,7 @@ class ImageShaderPainter {
 		lastTexture = tex;
 	}
 	
-	public function drawImageScale(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float, left: Float, top: Float, right: Float, bottom: Float, opacity: Float, color: Color): Void {
+	public inline function drawImageScale(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float, left: Float, top: Float, right: Float, bottom: Float, opacity: Float, color: Color): Void {
 		var tex = img;
 		if (bufferIndex + 1 >= bufferSize || (lastTexture != null && tex != lastTexture)) drawBuffer();
 		
@@ -252,13 +254,13 @@ class ColoredShaderPainter {
 	private static var bufferSize: Int = 100;
 	private var bufferIndex: Int;
 	private var rectVertexBuffer: VertexBuffer;
-    private var rectVertices: Array<Float>;
+    private var rectVertices: Float32Array;
 	private var indexBuffer: IndexBuffer;
 	
 	private static var triangleBufferSize: Int = 100;
 	private var triangleBufferIndex: Int;
 	private var triangleVertexBuffer: VertexBuffer;
-    private var triangleVertices: Array<Float>;
+    private var triangleVertices: Float32Array;
 	private var triangleIndexBuffer: IndexBuffer;
 	
 	private var g: Graphics;
@@ -436,6 +438,7 @@ class ColoredShaderPainter {
 		g.drawIndexedVertices(0, bufferIndex * 2 * 3);
 
 		bufferIndex = 0;
+		rectVertices = rectVertexBuffer.lock();
 	}
 	
 	private function drawTriBuffer(rectsDone: Bool): Void {
@@ -456,6 +459,7 @@ class ColoredShaderPainter {
 		g.drawIndexedVertices(0, triangleBufferIndex * 3);
 
 		triangleBufferIndex = 0;
+		triangleVertices = triangleVertexBuffer.lock();
 	}
 	
 	public function fillRect(color: Color,
@@ -492,7 +496,9 @@ class ColoredShaderPainter {
 	}
 }
 
+#if cpp
 @:headerClassCode("const wchar_t* wtext;")
+#end
 class TextShaderPainter {
 	private var projectionMatrix: Matrix4;
 	private var shaderProgram: Program;
@@ -502,7 +508,7 @@ class TextShaderPainter {
 	private static var bufferSize: Int = 100;
 	private var bufferIndex: Int;
 	private var rectVertexBuffer: VertexBuffer;
-    private var rectVertices: Array<Float>;
+    private var rectVertices: Float32Array;
 	private var indexBuffer: IndexBuffer;
 	private var font: Kravur;
 	private var lastTexture: Image;
@@ -654,6 +660,7 @@ class TextShaderPainter {
 
 		g.setTexture(textureLocation, null);
 		bufferIndex = 0;
+		rectVertices = rectVertexBuffer.lock();
 	}
 	
 	public function setFont(font: Font): Void {
@@ -662,30 +669,38 @@ class TextShaderPainter {
 	
 	private var text: String;
 	
+	#if cpp
 	@:functionCode('
 		wtext = text.__WCStr();
 	')
+	#end
 	private function startString(text: String): Void {
 		this.text = text;
 	}
 	
+	#if cpp
 	@:functionCode('
 		return wtext[position];
 	')
+	#end
 	private function charCodeAt(position: Int): Int {
 		return text.charCodeAt(position);
 	}
 	
+	#if cpp
 	@:functionCode('
 		return wcslen(wtext);
 	')
+	#end
 	private function stringLength(): Int {
 		return text.length;
 	}
 	
+	#if cpp
 	@:functionCode('
 		wtext = 0;
 	')
+	#end
 	private function endString(): Void {
 		text = null;
 	}
@@ -793,10 +808,12 @@ class Graphics2 extends kha.graphics2.Graphics {
 	public override function drawImage(img: kha.Image, x: Float, y: Float): Void {
 		coloredPainter.end();
 		textPainter.end();
-		var p1 = transformation.multvec(new Vector2(x, y + img.height));
+		var xw = x + img.width;
+		var yh = y + img.height;
+		var p1 = transformation.multvec(new Vector2(x, yh));
 		var p2 = transformation.multvec(new Vector2(x, y));
-		var p3 = transformation.multvec(new Vector2(x + img.width, y));
-		var p4 = transformation.multvec(new Vector2(x + img.width, y + img.height));
+		var p3 = transformation.multvec(new Vector2(xw, y));
+		var p4 = transformation.multvec(new Vector2(xw, yh));
 		imagePainter.drawImage(img, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, opacity, this.color);
 	}
 	

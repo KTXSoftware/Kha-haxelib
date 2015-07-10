@@ -320,7 +320,7 @@ class Starter {
 		}
 		Configuration.setScreen(gameToStart);
 		painter = new kha.wpf.Painter(Sys.pixelWidth, Sys.pixelHeight);
-		framebuffer = new Framebuffer(painter, null);
+		framebuffer = new Framebuffer(null, painter, null);
 		Scheduler.start();
 		if (autostartGame)
 			gameToStart.loadFinished();
@@ -332,7 +332,9 @@ class Starter {
 	}
 
 	@:functionCode('
-		new System.Windows.Application().Run(mainWindow);
+		if (System.Windows.Application.Current == null) {
+			new System.Windows.Application().Run(mainWindow);
+		}
 	')
 	static function startWindow() : Void {
 		

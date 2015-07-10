@@ -99,6 +99,15 @@ class Scaler {
 		return new TargetRectangle(scalex, scaley, scalew, scaleh, scale, rotation);
 	}
 	
+	/**
+	 * Transform the X value from the given position in the source to a position in the destination canvas.
+	 *
+	 * @param x					The X position.
+	 * @param y					The Y position.
+	 * @param source			The source image.
+	 * @param destination		The destination canvas.
+	 * @param rotation			The screen rotation.
+	 */
 	public static function transformX(x: Int, y: Int, source: Image, destination: Canvas, rotation: ScreenRotation): Int {
 		var targetRect = targetRect(source.width, source.height, destination, rotation);
 		switch (targetRect.rotation) {
@@ -112,7 +121,16 @@ class Scaler {
 			return Std.int((targetRect.y - y) / targetRect.scaleFactor);
 		}
 	}
-	
+
+	/**
+	 * Transform the Y value from the given position in the source to a position in the destination canvas.
+	 *
+	 * @param x					The X position.
+	 * @param y					The Y position.
+	 * @param source			The source image.
+	 * @param destination		The destination canvas.
+	 * @param rotation			The screen rotation.
+	 */
 	public static function transformY(x: Int, y: Int, source: Image, destination: Canvas, rotation: ScreenRotation): Int {
 		var targetRect = targetRect(source.width, source.height, destination, rotation);
 		switch (targetRect.rotation) {
@@ -138,17 +156,17 @@ class Scaler {
 	public static function getScaledTransformation(width: Int, height: Int, destination: Canvas, rotation: ScreenRotation): Matrix3 {
 		var rect = targetRect(width, height, destination, rotation);
 		var sf = rect.scaleFactor;
-		var transformation = new Matrix3([sf,  0, rect.x,
+		var transformation = new Matrix3(sf,  0, rect.x,
 										   0, sf, rect.y,
-										   0,  0, 1]);
+										   0,  0, 1);
 		switch (rotation) {
 		case RotationNone:
 		case Rotation90:
-			transformation = transformation * Matrix3.rotation(Math.PI / 2);
+			transformation = transformation.multmat(Matrix3.rotation(Math.PI / 2));
 		case Rotation180:
-			transformation = transformation * Matrix3.rotation(Math.PI);
+			transformation = transformation.multmat(Matrix3.rotation(Math.PI));
 		case Rotation270:
-			transformation = transformation * Matrix3.rotation(Math.PI * 3 / 2);
+			transformation = transformation.multmat(Matrix3.rotation(Math.PI * 3 / 2));
 		}
 		return transformation;
 	}

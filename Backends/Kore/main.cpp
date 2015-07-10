@@ -10,6 +10,7 @@
 #include <Kore/Audio/Mixer.h>
 #include <Kore/IO/FileReader.h>
 #include <Kore/Log.h>
+#include <Kore/Threads/Mutex.h>
 #include "jsmn.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,14 +19,21 @@
 #include <kha/input/Sensor.h>
 #include <kha/Sys.h>
 #include <kha/ScreenRotation.h>
+#include <kha/audio2/Audio.h>
+
+#ifdef ANDROID
+	#include <Kore/Vr/VrInterface.h>
+#endif
 
 extern "C" const char* hxRunLibrary();
 extern "C" void hxcpp_set_top_of_stack();
+void __hxcpp_register_current_thread();
 
 namespace {
 	using kha::Starter_obj;
 	using kha::input::Sensor_obj;
 
+	Kore::Mutex mutex;
 	bool shift = false;
 	
 	void keyDown(Kore::KeyCode code, wchar_t character) {
@@ -171,10 +179,29 @@ namespace {
 	void update() {
 		Kore::Audio::update();
 		if (visible) {
+			#ifndef VR_RIFT
 			Kore::Graphics::begin();
+			#endif
+			
+			// Google Cardboard: Update the Distortion mesh
+			#ifdef VR_CARDBOARD
+			//	Kore::VrInterface::DistortionBefore();
+			#endif
+
 			Starter_obj::frame();
+
+			#ifndef VR_RIFT
 			Kore::Graphics::end();
+			#endif
+			
+			// Google Cardboard: Call the DistortionMesh Renderer
+			#ifdef VR_CARDBOARD
+			//	Kore::VrInterface::DistortionAfter();
+			#endif
+
+			#ifndef VR_RIFT
 			Kore::Graphics::swapBuffers();
+			#endif
 		}
 	}
 	
@@ -216,6 +243,28 @@ namespace {
 				break;
 			case Kore::OrientationUnknown:
 				break;
+		}
+	}
+	
+	bool mixThreadregistered = false;
+
+	void mix(int samples) {
+		using namespace Kore;
+
+#ifdef KORE_MULTITHREADED_AUDIO
+		if (!mixThreadregistered) {
+			__hxcpp_register_current_thread();
+			mixThreadregistered = true;
+		}
+#endif
+
+		::kha::audio2::Audio_obj::_callCallback(samples);
+
+		for (int i = 0; i < samples; ++i) {
+			float value = ::kha::audio2::Audio_obj::_readSample();
+			*(float*)&Audio::buffer.data[Audio::buffer.writeLocation] = value;
+			Audio::buffer.writeLocation += 4;
+			if (Audio::buffer.writeLocation >= Audio::buffer.dataSize) Audio::buffer.writeLocation = 0;
 		}
 	}
 }
@@ -309,10 +358,17 @@ int kore(int argc, char** argv) {
 		delete string;
 	}
 
+	width = Kore::min(width, Kore::System::desktopWidth());
+	height = Kore::min(height, Kore::System::desktopHeight());
+
 	Kore::Application* app = new Kore::Application(argc, argv, width, height, fullscreen, name);
-	Kore::Mixer::init();
+	//Kore::Mixer::init();
+	mutex.Create();
+	Kore::Audio::audioCallback = mix;
 	Kore::Audio::init();
+#ifndef VR_RIFT
 	Kore::Graphics::setRenderState(Kore::DepthTest, false);
+#endif
 	app->orientationCallback = orientation;
 	app->foregroundCallback = foreground;
 	app->resumeCallback = resume;
@@ -342,6 +398,12 @@ int kore(int argc, char** argv) {
 	Kore::Surface::the()->Move = touchMove;
 	Kore::Sensor::the(Kore::SensorAccelerometer)->Changed = accelerometerChanged;
 	Kore::Sensor::the(Kore::SensorGyroscope)->Changed = gyroscopeChanged;
+
+
+#ifdef VR_GEAR_VR
+	// Enter VR mode
+	Kore::VrInterface::Initialize();
+#endif
 
 	Kore::log(Kore::Info, "Starting application");
 	app->start();

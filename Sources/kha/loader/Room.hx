@@ -1,12 +1,30 @@
 package kha.loader;
 
-class Room {
-	public function new(id: String) {
-		this.id = id;
+/**
+ * A group of resources that can be loaded.
+ */
+class Room { // Guess why is this name for ;).
+	/**
+	 * The name of the group.
+	 */
+	public var name: String;
+	/** 
+	 * The group of asset objects.
+	 */
+	public var assets: Array<Dynamic>;
+	/**
+	 * The parent group.
+	 */
+	public var parent: Room;
+
+	/**
+	 * Instantiate a new group.
+	 *
+	 * @param name		The group name.
+	 */
+	public function new(name: String) {
+		this.name = name;
 		assets = new Array<Dynamic>();
 		parent = null;
 	}
-	public var id: String;
-	public var assets: Array<Dynamic>;
-	public var parent: Room;
 }
