@@ -4,8 +4,8 @@
 	"license": "MIT",
 	"tags": ["cross", "game"],
 	"description": "Ultra portable game/media-app framework",
-	"version": "15.7.2",
-	"releasenote": "Updated to revision 77cf05b4ef41bf2f8d8e9e9321296e886f8d4b3f plus OSX/Linux Haxe call fix.",
+	"version": "15.7.3",
+	"releasenote": "Updated to revision 77cf05b4ef41bf2f8d8e9e9321296e886f8d4b3f plus cherry picked Kore's 0330820f49001e0cb7e764e51bd7c9173c51bb10.",
 	"contributors": ["RobDangerous"],
 	"dependencies": { }
 }
