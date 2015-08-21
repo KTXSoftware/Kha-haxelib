@@ -1,5 +1,5 @@
 var child_process = require('child_process');
-var fs = require('fs');
+var fs = require('fs-extra');
 var os = require('os');
 var path = require('path');
 var log = require('./log.js');
@@ -127,18 +127,40 @@ function shaderLang(platform) {
 		case Platform.Tizen:
 			return "essl";
 		default:
-			return "unknown";
+			return platform;
 	}
 }
 
-function compileShader(type, from, to, temp, platform) {
+function compileShader(projectDir, type, from, to, temp, platform, nokrafix) {
+	var compiler = '';
+	
 	if (Project.koreDir.path !== '') {
-		var path = Project.koreDir.resolve(Paths.get("Tools", "krafix", "krafix" + exec.sys()));
-		child_process.spawnSync(path.toString(), [type, from, to, temp, platform]);
+		if(nokrafix) {
+			compiler = Project.koreDir.resolve(Paths.get("Tools", "kfx", "kfx" + exec.sys())).toString();
+		} else {
+			compiler = Project.koreDir.resolve(Paths.get("Tools", "krafix", "krafix" + exec.sys())).toString();
+		}
+	}
+
+	if (fs.existsSync(path.join(projectDir.toString(), 'Backends'))) {
+		var libdirs = fs.readdirSync(path.join(projectDir.toString(), 'Backends'));
+		for (var ld in libdirs) {
+			var libdir = path.join(projectDir.toString(), 'Backends', libdirs[ld]);
+			if (fs.statSync(libdir).isDirectory()) {
+				var exe = path.join(libdir, 'krafix', 'krafix-' + platform + '.exe');
+				if (fs.existsSync(exe)) {
+					compiler = exe;
+				}
+			}
+		}
+	}
+
+	if (compiler !== '') {
+		child_process.spawnSync(compiler, [type, from, to, temp, platform]);
 	}
 }
 
-function exportKakeProject(from, to, platform, options) {
+function exportKoremakeProject(from, to, platform, options) {
 	log.info("korefile found, generating build files.");
 	log.info("Generating " + fromPlatform(platform) + " solution.");
 
@@ -157,14 +179,14 @@ function exportKakeProject(from, to, platform, options) {
 			var index = outfile.lastIndexOf('/');
 			if (index > 0) outfile = outfile.substr(index);
 			outfile = outfile.substr(0, outfile.length - 5);
-			compileShader(shaderLang(platform), file, path.join(project.getDebugDir(), outfile), "build", platform);
+			compileShader(from, shaderLang(platform), file, path.join(project.getDebugDir(), outfile), "build", platform, options.nokrafix);
 		}
 	}
 
 	var exporter = null;
 	if (platform == Platform.iOS || platform == Platform.OSX) exporter = new ExporterXCode();
 	else if (platform == Platform.Android) exporter = new ExporterAndroid();
-	else if (platform == Platform.HTML5) exporter = new ExporterEmscripten();
+	else if (platform == Platform.HTML5) exporter = new ExporterEmscripten(options.emcc);
 	else if (platform == Platform.Linux) {
 		if (options.compile) exporter = new ExporterMakefile();
 		else exporter = new ExporterCodeBlocks();
@@ -182,15 +204,15 @@ function exportKakeProject(from, to, platform, options) {
 			exporter = new ExporterVisualStudio();
 		}
 		else {
-			var libdirs = fs.readdirSync(path.join(from.toString(), 'Libraries'));
+			var libdirs = fs.readdirSync(path.join(from.toString(), 'Backends'));
 			for (var ld in libdirs) {
 				var libdir = libdirs[ld];
-				if (fs.statSync(path.join(from.toString(), 'Libraries', libdir)).isDirectory()) {
-					var libfiles = fs.readdirSync(path.join(from.toString(), 'Libraries', libdir));
+				if (fs.statSync(path.join(from.toString(), 'Backends', libdir)).isDirectory()) {
+					var libfiles = fs.readdirSync(path.join(from.toString(), 'Backends', libdir));
 					for (var lf in libfiles) {
 						var libfile = libfiles[lf];
 						if (libfile.startsWith('Exporter') && libfile.endsWith('.js')) {
-							var Exporter = require(path.relative(__dirname, path.join(from.toString(), 'Libraries', libdir, libfile)));
+							var Exporter = require(path.relative(__dirname, path.join(from.toString(), 'Backends', libdir, libfile)));
 							exporter = new Exporter();
 							break;
 						}
@@ -199,22 +221,22 @@ function exportKakeProject(from, to, platform, options) {
 			}
 		}
 	}
-	exporter.exportSolution(solution, from, to, platform, options.vrApi);
+	exporter.exportSolution(solution, from, to, platform, options.vrApi, options.nokrafix);
 
-	return solution.getName();
+	return solution;
 }
 
-function isKakeProject(directory) {
+function isKoremakeProject(directory) {
 	return Files.exists(directory.resolve("korefile.js"));
 }
 
 function exportProject(from, to, platform, options) {
-	if (isKakeProject(from)) {
-		return exportKakeProject(from, to, platform, options);
+	if (isKoremakeProject(from)) {
+		return exportKoremakeProject(from, to, platform, options);
 	}
 	else {
 		log.error("korefile.js not found.");
-		return "";
+		return null;
 	}
 }
 
@@ -232,11 +254,13 @@ exports.run = function (options, loglog, callback) {
 	}
 	
 	if (options.vrApi !== undefined) {
-    	Options.vrApi = options.vrApi;
+		Options.vrApi = options.vrApi;
 	}
 	
-	var solutionName = exportProject(Paths.get(options.from), Paths.get(options.to), options.platform, options);
-
+	var solution = exportProject(Paths.get(options.from), Paths.get(options.to), options.platform, options);
+	var project = solution.getProjects()[0];
+	var solutionName = solution.getName();
+	
 	if (options.compile && solutionName != "") {
 		log.info('Compiling...');
 
@@ -245,11 +269,30 @@ exports.run = function (options, loglog, callback) {
 		if (options.platform === Platform.Linux) {
 			make = child_process.spawn('make', [], { cwd: options.to });
 		}
-		else if (options.platform == Platform.OSX) {
+		else if (options.platform === Platform.OSX) {
 			make = child_process.spawn('xcodebuild', ['-project', solutionName + '.xcodeproj'], { cwd: options.to });
 		}
+		else if (options.platform === Platform.Windows) {
+			var vsvars = null;
+			if (process.env.VS140COMNTOOLS) {
+				vsvars = process.env.VS140COMNTOOLS + '\\vsvars32.bat';
+			}
+			else if (process.env.VS120COMNTOOLS) {
+				vsvars = process.env.VS120COMNTOOLS + '\\vsvars32.bat';
+			}
+			else if (process.env.VS110COMNTOOLS) {
+				vsvars = process.env.VS110COMNTOOLS + '\\vsvars32.bat';
+			}
+			if (vsvars !== null) {
+				fs.writeFileSync(path.join(options.to, 'build.bat'), '@call "' + vsvars + '"\n' + '@MSBuild.exe ' + solutionName + '.vcxproj /m /p:Configuration=Debug,Platform=Win32');
+				make = child_process.spawn('build.bat', {cwd: options.to});
+			}
+			else {
+				log.error('Visual Studio not found.');
+			}
+		}
 
-		if (make != null) {
+		if (make !== null) {
 			make.stdout.on('data', function (data) {
 				log.info(data.toString());
 			});
@@ -259,13 +302,28 @@ exports.run = function (options, loglog, callback) {
 			});
 
 			make.on('close', function (code) {
-				if (options.run) {
-					if (options.platform == Platform.OSX) {
-						child_process.spawn('open', ['build/Release/' + solutionName + '.app/Contents/MacOS/' + solutionName], { cwd: options.to });
+				if (code === 0) {
+					if (options.platform === Platform.Linux) {
+						fs.copySync(path.join(options.to.toString(), solutionName), path.join(options.from.toString(), project.getDebugDir(), solutionName));
 					}
-					else {
-						log.info('--run not yet implemented for this platform');
+					else if (options.platform === Platform.Windows) {
+						fs.copySync(path.join(options.to.toString(), 'Debug', solutionName + '.exe'), path.join(options.from.toString(), project.getDebugDir(), solutionName + '.exe'));
 					}
+					if (options.run) {
+						if (options.platform === Platform.OSX) {
+							child_process.spawn('open', ['build/Release/' + solutionName + '.app/Contents/MacOS/' + solutionName], {cwd: options.to});
+						}
+						else if (options.platform === Platform.Linux || options.platform === Platform.Windows) {
+							child_process.spawn(path.resolve(path.join(options.from.toString(), project.getDebugDir(), solutionName)), [], {cwd: path.join(options.from.toString(), project.getDebugDir())});
+						}
+						else {
+							log.info('--run not yet implemented for this platform');
+						}
+					}
+				}
+				else {
+					log.error('Compilation failed.');
+					process.exit(code);
 				}
 
 				callback();

@@ -2,7 +2,7 @@ package kha.audio2;
 
 import haxe.ds.Vector;
 
-class SoundChannel {
+class SoundChannel implements kha.audio1.SoundChannel {
 	public var data: Vector<Float>;
 	private var myVolume: Float;
 	private var myPosition: Int;
@@ -13,7 +13,7 @@ class SoundChannel {
 		myPosition = 0;
 	}
 	
-	public function nextSamples(samples: Vector<FastFloat>, length: Int): Void {
+	public function nextSamples(samples: Vector<FastFloat>, length: Int, sampleRate: Int): Void {
 		if (paused) {
 			for (i in 0...length) {
 				samples[i] = 0;

@@ -7,8 +7,9 @@ class ControllerBuilder {
 	macro static public function build(): Array<Field> {
 		var fields = Context.getBuildFields();
 		
-		#if js
-		#if !node
+		// macros failing everywhere but in JavaScript?
+		#if (!sys_server && sys_html5)
+		
 		{
 			var funcindex = 0;
 			for (field in fields) {
@@ -45,7 +46,7 @@ class ControllerBuilder {
 					
 					var expr = macro @:mergeBlock {
 						var bytes = haxe.io.Bytes.alloc($v { size } );
-						bytes.set(0, kha.networking.Session.CONTROLLER_UPDATES);
+						bytes.set(0, kha.network.Session.CONTROLLER_UPDATES);
 						bytes.setInt32(1, _id());
 						bytes.setDouble(5, Scheduler.realTime());
 						bytes.setInt32(13, $v { funcindex } );
@@ -96,8 +97,10 @@ class ControllerBuilder {
 					}
 					var original = f.expr;
 					expr = macro {
-						$expr;
-						kha.networking.Session.the().network.send(bytes, false);
+						if (kha.network.Session.the() != null) {
+							$expr;
+							kha.network.Session.the().network.send(bytes, false);
+						}
 						$original;
 					};
 					f.expr = expr;
@@ -106,7 +109,11 @@ class ControllerBuilder {
 				++funcindex;
 			}
 		}
+		
 		#end
+		
+		// macros failing everywhere but in JavaScript?
+		#if (sys_server || sys_html5)
 		
 		var receive = macro @:mergeBlock {
 			var funcindex = bytes.getInt32(offset + 0);
@@ -238,6 +245,33 @@ class ControllerBuilder {
 			pos: Context.currentPos()
 		});
 		
+		#else
+		
+		fields.push({
+			name: "_receive",
+			doc: null,
+			meta: [],
+			access: [APublic],
+			kind: FFun({
+				ret: null,
+				params: null,
+				expr: macro {},
+				args: [{
+					value: null,
+					type: Context.toComplexType(Context.getType("Int")),
+					opt: null,
+					name: "offset" },
+					{
+					value: null,
+					type: Context.toComplexType(Context.getType("haxe.io.Bytes")),
+					opt: null,
+					name: "bytes"}]
+			}),
+			pos: Context.currentPos()
+		});
+		
+		#end
+		
 		fields.push({
 			name: "_id",
 			doc: null,
@@ -260,7 +294,6 @@ class ControllerBuilder {
 			kind: FVar(macro: Int, macro 0),
 			pos: Context.currentPos()
 		});
-		#end
 		
 		return fields;
 	}

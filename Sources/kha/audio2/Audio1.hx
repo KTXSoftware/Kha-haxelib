@@ -4,8 +4,6 @@ package kha.audio2;
 import cpp.vm.Mutex;
 #end
 import haxe.ds.Vector;
-import kha.audio1.MusicChannel;
-import kha.audio1.SoundChannel;
 
 class Audio1 {
 	private static inline var channelCount: Int = 16;
@@ -58,14 +56,14 @@ class Audio1 {
 
 		for (channel in internalSoundChannels) {
 			if (channel == null || channel.finished) continue;
-			channel.nextSamples(sampleCache1, samples);
+			channel.nextSamples(sampleCache1, samples, buffer.samplesPerSecond);
 			for (i in 0...samples) {
 				sampleCache2[i] += sampleCache1[i] * channel.volume;
 			}
 		}
 		for (channel in internalMusicChannels) {
 			if (channel == null || channel.finished) continue;
-			channel.nextSamples(sampleCache1, samples);
+			channel.nextSamples(sampleCache1, samples, buffer.samplesPerSecond);
 			for (i in 0...samples) {
 				sampleCache2[i] += sampleCache1[i] * channel.volume;
 			}
@@ -84,7 +82,7 @@ class Audio1 {
 		#if cpp
 		mutex.acquire();
 		#end
-		var channel: kha.audio1.SoundChannel = null;
+		var channel: kha.audio2.SoundChannel = null;
 		for (i in 0...channelCount) {
 			if (soundChannels[i] == null || soundChannels[i].finished) {
 				channel = new SoundChannel();
@@ -100,11 +98,18 @@ class Audio1 {
 	}
 	
 	public static function playMusic(music: Music, loop: Bool = false): kha.audio1.MusicChannel {
+		{
+			// try to use hardware accelerated audio decoding
+			var hardwareChannel = Audio.playMusic(music, loop);
+			if (hardwareChannel != null) return hardwareChannel;
+		}
+		
 		if (music.data == null) return null;
+		
 		#if cpp
 		mutex.acquire();
 		#end
-		var channel: kha.audio1.MusicChannel = null;
+		var channel: kha.audio2.MusicChannel = null;
 		for (i in 0...channelCount) {
 			if (musicChannels[i] == null || musicChannels[i].finished) {
 				channel = new MusicChannel(music.data, loop);

@@ -141,7 +141,7 @@ var options = [
 		short: 'v',
 		description: 'Version of Visual Studio to use',
 		value: true,
-		default: VisualStudioVersion.VS2013
+		default: VisualStudioVersion.VS2015
 	},
 	{
 		full: 'kha',
@@ -401,7 +401,7 @@ if (parsedOptions.init) {
 	
 	if (!fs.existsSync(path.join(parsedOptions.from, 'Sources', friendlyName + '.hx'))) {
 		var projectsource = 'package;\n\nimport kha.Game;\n\n'
-			+ 'class ' + friendlyName + ' {\n'
+			+ 'class ' + friendlyName + ' extends Game {\n'
 			+ '\tpublic function new() {\n'
 			+ '\t\tsuper("' + parsedOptions.name + '");\n'
 			+ '\t}\n\n'
@@ -416,8 +416,8 @@ if (parsedOptions.init) {
 }
 else if (parsedOptions.server) {
 	console.log('Running server on ' + parsedOptions.port);
-	var static = require('node-static');
-	var fileServer = new static.Server(path.join(parsedOptions.from,'build', 'html5'));
+	var nstatic = require('node-static');
+	var fileServer = new nstatic.Server(path.join(parsedOptions.from,'build', 'html5'), { cache: 0 });
 	require('http').createServer(function (request, response) {
 		request.addListener('end', function () {
 			fileServer.serve(request, response);

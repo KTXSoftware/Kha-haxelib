@@ -4,17 +4,23 @@ var log = require('./log.js');
 
 exports.convert = function (inFilename, outFilename, encoder, callback, args) {
 	if (fs.existsSync(outFilename.toString()) && fs.statSync(outFilename.toString()).mtime.getTime() > fs.statSync(inFilename.toString()).mtime.getTime()) {
-		callback();
+		callback(true);
 		return;
 	}
 	
 	if (encoder === undefined || encoder === '') {
-		callback();
+		callback(false);
 		return;
 	}
-	var parts = encoder.split(' ');
+	
+	var dirend = Math.max(encoder.lastIndexOf('/'), encoder.lastIndexOf('\\'));
+	var firstspace = encoder.indexOf(' ', dirend);
+	var exe = encoder.substr(0, firstspace);
+	var arguments = encoder.substr(firstspace + 1);
+
+	var parts = arguments.split(' ');
 	var options = [];
-	for (var i = 1; i < parts.length; ++i) {
+	for (var i = 0; i < parts.length; ++i) {
 		var foundarg = false;
 		if (args !== undefined) {
 			for (var arg in args) {
@@ -31,7 +37,7 @@ exports.convert = function (inFilename, outFilename, encoder, callback, args) {
 		else if (parts[i] === '{out}') options.push(outFilename.toString());
 		else options.push(parts[i]);
 	}
-	var child = child_process.spawn(parts[0], options);
+	var child = child_process.spawn(exe, options);
 
 	child.stdout.on('data', function (data) {
 		//log.info(encoder + ' stdout: ' + data);
@@ -43,11 +49,11 @@ exports.convert = function (inFilename, outFilename, encoder, callback, args) {
 	
 	child.on('error', function (err) {
 		log.error(encoder + ' error: ' + err);
-		callback();
+		callback(false);
 	});
 	
 	child.on('close', function (code) {
 		if (code !== 0) log.error(encoder + ' process exited with code ' + code);
-		callback();
+		callback(code === 0);
 	});
 };

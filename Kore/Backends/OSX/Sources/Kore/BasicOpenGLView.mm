@@ -11,14 +11,30 @@ namespace {
 }
 
 + (NSOpenGLPixelFormat*) basicPixelFormat {
-	NSOpenGLPixelFormatAttribute attributes[] = {
-		//NSOpenGLPFAWindow,
-		NSOpenGLPFADoubleBuffer,	// double buffered
-		NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)24, // 16 bit depth buffer
-		NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
-		(NSOpenGLPixelFormatAttribute)nil
-	};
-	return [[[NSOpenGLPixelFormat alloc] initWithAttributes:attributes] autorelease];
+	int aa = Kore::Application::the()->antialiasing();
+	if (aa > 0) {
+		NSOpenGLPixelFormatAttribute attributes[] = {
+			//NSOpenGLPFAWindow,
+			NSOpenGLPFADoubleBuffer,	// double buffered
+			NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)24, // 16 bit depth buffer
+			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+			
+			NSOpenGLPFASupersample,
+			NSOpenGLPFASampleBuffers, (NSOpenGLPixelFormatAttribute)1,
+			NSOpenGLPFASamples, (NSOpenGLPixelFormatAttribute)aa,
+			(NSOpenGLPixelFormatAttribute)nil
+		};
+		return [[[NSOpenGLPixelFormat alloc] initWithAttributes:attributes] autorelease];
+	}
+	else {
+		NSOpenGLPixelFormatAttribute attributes[] = {
+			NSOpenGLPFADoubleBuffer,
+			NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)24,
+			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+			(NSOpenGLPixelFormatAttribute)nil
+		};
+		return [[[NSOpenGLPixelFormat alloc] initWithAttributes:attributes] autorelease];
+	}
 }
 
 - (void)switchBuffers {
@@ -62,6 +78,14 @@ namespace {
 			case NSDownArrowFunctionKey:
 				Kore::Keyboard::the()->_keydown(Kore::Key_Down, 0);
 				break;
+            case 27:
+                Kore::Keyboard::the()->_keydown(Kore::Key_Escape, 0);
+                break;
+            case NSEnterCharacter:
+            case NSNewlineCharacter:
+            case NSCarriageReturnCharacter:
+				Kore::Keyboard::the()->_keydown(Kore::Key_Enter, 0);
+				break;
             case 0x7f:
                 Kore::Keyboard::the()->_keydown(Kore::Key_Backspace, 0);
                 break;
@@ -92,6 +116,14 @@ namespace {
 		case NSDownArrowFunctionKey:
 			Kore::Keyboard::the()->_keyup(Kore::Key_Down, 0);
 			break;
+        case 27:
+            Kore::Keyboard::the()->_keyup(Kore::Key_Escape, 0);
+            break;
+        case NSEnterCharacter:
+        case NSNewlineCharacter:
+        case NSCarriageReturnCharacter:
+            Kore::Keyboard::the()->_keyup(Kore::Key_Enter, 0);
+            break;
 		case 0x7f:
 			Kore::Keyboard::the()->_keyup(Kore::Key_Backspace, 0);
 			break;

@@ -5,10 +5,10 @@ import kha.network.Controller;
 
 @:allow(kha.Starter)
 @:expose
-class Keyboard 
-#if js
-//implements Controller
-#end
+class Keyboard
+//#if sys_server || sys_html5
+implements Controller
+//#end
 {
 	public static function get(num: Int = 0): Keyboard {
 		if (num != 0) return null;
@@ -37,8 +37,8 @@ class Keyboard
 	
 	@input
 	private function sendDownEvent(key: Key, char: String): Void {
-		#if node
-		js.Node.console.log("Down: " + key + " from " + kha.networking.Session.the().me.id);
+		#if sys_server
+		js.Node.console.log("Down: " + key + " from " + kha.network.Session.the().me.id);
 		#end
 		for (listener in downListeners) {
 			listener(key, char);
@@ -47,8 +47,8 @@ class Keyboard
 	
 	@input
 	private function sendUpEvent(key: Key, char: String): Void {
-		#if node
-		js.Node.console.log("Up: " + key + " from " + kha.networking.Session.the().me.id);
+		#if sys_server
+		js.Node.console.log("Up: " + key + " from " + kha.network.Session.the().me.id);
 		#end
 		for (listener in upListeners) {
 			listener(key, char);

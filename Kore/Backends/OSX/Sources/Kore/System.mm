@@ -2,6 +2,7 @@
 #include <Kore/System.h>
 #include <Kore/Application.h>
 #include <Kore/Input/Keyboard.h>
+#include <Kore/Log.h>
 #import <Cocoa/Cocoa.h>
 #import "BasicOpenGLView.h"
 

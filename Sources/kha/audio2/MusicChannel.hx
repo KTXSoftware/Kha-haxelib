@@ -6,7 +6,7 @@ import haxe.io.BytesOutput;
 import kha.audio2.ogg.vorbis.Reader;
 
 #if !cpp
-class MusicChannel {
+class MusicChannel implements kha.audio1.MusicChannel {
 	private var reader: Reader;
 	private var atend: Bool = false;
 	private var loop: Bool;
@@ -19,7 +19,7 @@ class MusicChannel {
 		reader = Reader.openFromBytes(data);
 	}
 
-	public function nextSamples(samples: Vector<FastFloat>, length: Int): Void {
+	public function nextSamples(samples: Vector<FastFloat>, length: Int, sampleRate: Int): Void {
 		if (paused) {
 			for (i in 0...length) {
 				samples[i] = 0;
@@ -27,7 +27,7 @@ class MusicChannel {
 			return;
 		}
 		
-		var count = reader.read(samples, Std.int(length / 2), 2, 44100, true) * 2;
+		var count = reader.read(samples, Std.int(length / 2), 2, sampleRate, true) * 2;
 		if (count < length) {
 			if (loop) {
 				reader.currentMillisecond = 0;

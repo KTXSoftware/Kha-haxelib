@@ -8,10 +8,13 @@ import js.html.Event;
 import js.html.EventListener;
 import js.html.KeyboardEvent;
 import js.html.MouseEvent;
+import js.html.Touch;
+import js.html.TouchEvent;
 import kha.Game;
 import kha.graphics4.TextureFormat;
 import kha.input.Gamepad;
 import kha.input.Keyboard;
+import kha.input.Surface;
 import kha.js.AudioElementAudio;
 import kha.js.CanvasGraphics;
 import kha.Key;
@@ -31,6 +34,8 @@ class GamepadStates {
 }
 
 class Starter {
+	private static var maxGamepads : Int = 4;
+	
 	private var gameToStart: Game;
 	private static var frame: Framebuffer;
 	private static var pressedKeys: Array<Bool>;
@@ -38,19 +43,26 @@ class Starter {
 	private static var leftMouseCtrlDown: Bool = false;
 	private static var keyboard: Keyboard;
 	private static var mouse: kha.input.Mouse;
-	private static var gamepad: Gamepad;
+	private static var surface: Surface;
+	private static var gamepads: Array<Gamepad>;
 	private static var gamepadStates: Array<GamepadStates>;
 	
 	private static var mouseX: Int;
 	private static var mouseY: Int;
+	private static var touchX: Int;
+	private static var touchY: Int;
 	
 	public function new(?backbufferFormat: TextureFormat) {
 		haxe.Log.trace = untyped js.Boot.__trace; // Hack for JS trace problems
 		keyboard = new Keyboard();
 		mouse = new kha.input.Mouse();
-		gamepad = new Gamepad();
+		surface = new Surface();
+		gamepads = new Array<Gamepad>();
 		gamepadStates = new Array<GamepadStates>();
-		gamepadStates.push(new GamepadStates());
+		for (i in 0...maxGamepads) {
+			gamepads[i] = new Gamepad(i);
+			gamepadStates[i] = new GamepadStates();
+		}
 		pressedKeys = new Array<Bool>();
 		for (i in 0...256) pressedKeys.push(false);
 		for (i in 0...256) pressedKeys.push(null);
@@ -83,17 +95,17 @@ class Starter {
 	static function checkGamepad(pad: Dynamic) {
 		for (i in 0...pad.axes.length) {
 			if (pad.axes[i] != null) {
-				if (gamepadStates[0].axes[i] != pad.axes[i]) {
-					gamepadStates[0].axes[i] = pad.axes[i];
-					gamepad.sendAxisEvent(i, pad.axes[i]);
+				if (gamepadStates[pad.index].axes[i] != pad.axes[i]) {
+					gamepadStates[pad.index].axes[i] = pad.axes[i];
+					gamepads[pad.index].sendAxisEvent(i, pad.axes[i]);
 				}
 			}
 		}
 		for (i in 0...pad.buttons.length) {
 			if (pad.buttons[i] != null) {
-				if (gamepadStates[0].buttons[i] != pad.buttons[i].value) {
-					gamepadStates[0].buttons[i] = pad.buttons[i].value;
-					gamepad.sendButtonEvent(i, pad.buttons[i].value);
+				if (gamepadStates[pad.index].buttons[i] != pad.buttons[i].value) {
+					gamepadStates[pad.index].buttons[i] = pad.buttons[i].value;
+					gamepads[pad.index].sendButtonEvent(i, pad.buttons[i].value);
 				}
 			}
 		}
@@ -166,11 +178,10 @@ class Starter {
 			if (requestAnimationFrame == null) window.setTimeout(animate, 1000.0 / 60.0);
 			else requestAnimationFrame(animate);
 			
-			var gamepads: Dynamic = untyped __js__("navigator.getGamepads && navigator.getGamepads()");
-			if (gamepads == null) gamepads = untyped __js__("navigator.webkitGetGamepads && navigator.webkitGetGamepads()");
-			if (gamepads != null) {
-				for (i in 0...gamepads.length) {
-					var pad = gamepads[i];
+			var sysGamepads: Dynamic = untyped __js__("(navigator.getGamepads && navigator.getGamepads()) || (navigator.webkitGetGamepads && navigator.webkitGetGamepads())");
+			if (sysGamepads != null) {
+				for (i in 0...sysGamepads.length) {
+					var pad = sysGamepads[i];
 					if (pad != null) {
 						checkGamepadButton(pad, 0, Button.BUTTON_1);
 						checkGamepadButton(pad, 1, Button.BUTTON_2);
@@ -179,9 +190,7 @@ class Starter {
 						checkGamepadButton(pad, 14, Button.LEFT);
 						checkGamepadButton(pad, 15, Button.RIGHT);
 						
-						if (pad.index == 0) {
-							checkGamepad(pad);
-						}
+						checkGamepad(pad);
 					}					
 				}
 			}
@@ -189,6 +198,21 @@ class Starter {
 			Scheduler.executeFrame();
 			
 			if (canvas.getContext) {
+
+				// Lookup the size the browser is displaying the canvas.
+				//TODO deal with window.devicePixelRatio ?
+				var displayWidth  = canvas.clientWidth;
+				var displayHeight = canvas.clientHeight;
+
+				// Check if the canvas is not the same size.
+				if (canvas.width  != displayWidth ||
+					canvas.height != displayHeight) {
+
+					// Make the canvas the same size
+					canvas.width  = displayWidth;
+					canvas.height = displayHeight;
+				}
+
 				Configuration.screen().render(frame);
 				if (Sys.gl != null) {
 					// Clear alpha for IE11
@@ -216,6 +240,9 @@ class Starter {
 		canvas.onmousemove = mouseMove;
 		canvas.onkeydown = keyDown;
 		canvas.onkeyup = keyUp;
+		canvas.addEventListener("touchstart", touchDown, false);
+		canvas.addEventListener("touchend", touchUp, false);
+		canvas.addEventListener("touchmove", touchMove, false);
 		
 		Browser.window.addEventListener("unload", unload);
 
@@ -283,6 +310,41 @@ class Starter {
 		setMouseXY(event);
 		Game.the.mouseMove(mouseX, mouseY);
 		mouse.sendMoveEvent(mouseX, mouseY);
+	}
+	
+	private static function setTouchXY(touch: Touch): Void {
+		var rect = Sys.khanvas.getBoundingClientRect();
+		var borderWidth = Sys.khanvas.clientLeft;
+		var borderHeight = Sys.khanvas.clientTop;
+		touchX = Std.int((touch.clientX - rect.left - borderWidth) * Sys.khanvas.width / (rect.width - 2 * borderWidth));
+		touchY = Std.int((touch.clientY - rect.top - borderHeight) * Sys.khanvas.height / (rect.height - 2 * borderHeight));
+	}
+	
+	private static function touchDown(event: TouchEvent): Void {
+		for (touch in event.changedTouches)	{
+			setTouchXY(touch);
+			Game.the.mouseDown(touchX, touchY);
+			mouse.sendDownEvent(0, touchX, touchY);
+			surface.sendTouchStartEvent(touch.identifier, touchX, touchY);
+		}
+	}
+	
+	private static function touchUp(event: TouchEvent): Void {
+		for (touch in event.changedTouches)	{
+			setTouchXY(touch);
+			Game.the.mouseUp(touchX, touchY);
+			mouse.sendUpEvent(0, touchX, touchY);
+			surface.sendTouchEndEvent(touch.identifier, touchX, touchY);
+		}
+	}
+	
+	private static function touchMove(event: TouchEvent): Void {
+		for (touch in event.changedTouches) {
+			setTouchXY(touch);
+			Game.the.mouseMove(touchX, touchY);
+			mouse.sendMoveEvent(touchX, touchY);
+			surface.sendMoveEvent(touch.identifier, touchX, touchY);
+		}
 	}
 	
 	private static function keycodeToChar(key: String, keycode: Int, shift: Bool): String {

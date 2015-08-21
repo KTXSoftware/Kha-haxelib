@@ -4,11 +4,12 @@ import js.Node;
 import kha.Game;
 import kha.input.Gamepad;
 import kha.input.Keyboard;
+import kha.js.EmptyGraphics1;
 import kha.js.EmptyGraphics2;
 import kha.js.EmptyGraphics4;
 import kha.Key;
 import kha.Loader;
-import kha.networking.Session;
+import kha.network.Session;
 
 class Starter {
 	private var gameToStart: Game;
@@ -42,17 +43,22 @@ class Starter {
 		gameToStart.height = Loader.the.height;
 			
 		Sys.init(gameToStart.width, gameToStart.height);
-		frame = new Framebuffer(new EmptyGraphics2(gameToStart.width, gameToStart.height), new EmptyGraphics4(gameToStart.width, gameToStart.height));
+		frame = new Framebuffer(new EmptyGraphics1(gameToStart.width, gameToStart.height), new EmptyGraphics2(gameToStart.width, gameToStart.height), new EmptyGraphics4(gameToStart.width, gameToStart.height));
 		Scheduler.start();
 		
 		Configuration.setScreen(gameToStart);
 		
 		gameToStart.loadFinished();
 		
+		var lastTime = 0;
 		Node.setInterval(function () {
 			Scheduler.executeFrame();
 			Session.the().update();
-			Node.console.log("" + Scheduler.time());
+			var time = Scheduler.time();
+			if (time >= lastTime + 10) {
+				lastTime += 10;
+				Node.console.log(lastTime + " seconds.");
+			}
 		}, 100);
 	}
 }

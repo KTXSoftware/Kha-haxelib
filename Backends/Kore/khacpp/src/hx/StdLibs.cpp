@@ -1,7 +1,9 @@
 #include <hxcpp.h>
 #include <hxMath.h>
 
-#ifdef HX_WINDOWS
+#ifdef SYS_CONSOLE
+
+#elif defined(HX_WINDOWS)
 #include <windows.h>
 #include <stdio.h>
 #include <io.h>
@@ -192,12 +194,12 @@ void __trace(Dynamic inObj, Dynamic inData)
       "%s\n", inObj.GetPtr() ? inObj->toString().__s : "null" );
 #else
 #ifdef HX_UTF8_STRINGS
-   Kore::log(Kore::Info, "%s:%d: %s\n",
+   Kore::log(Kore::Info, "%s:%d: %s",
                inData==null() ? "?" : inData->__Field( HX_CSTRING("fileName") , HX_PROP_DYNAMIC) ->toString().__s,
                inData==null() ? 0 : inData->__Field( HX_CSTRING("lineNumber") , HX_PROP_DYNAMIC)->__ToInt(),
                inObj.GetPtr() ? inObj->toString().__s : "null" );
 #else
-   Kore::log(Kore::Info, "%S:%d: %S\n",
+   Kore::log(Kore::Info, "%S:%d: %S",
                inData->__Field( HX_CSTRING("fileName") , HX_PROP_DYNAMIC)->__ToString().__s,
                inData->__Field( HX_CSTRING("lineNumber") , HX_PROP_DYNAMIC)->__ToInt(),
                inObj.GetPtr() ? inObj->toString().__s : L"null" );
@@ -213,7 +215,9 @@ void __hxcpp_exit(int inExitCode)
 static double t0 = 0;
 double  __time_stamp()
 {
-#ifdef HX_WINDOWS
+#if defined(SYS_CONSOLE)
+   return 0;
+#elif defined(HX_WINDOWS)
    static __int64 t0=0;
    static double period=0;
    __int64 now;
@@ -300,7 +304,11 @@ Array<String> __get_args()
    #else // linux
 
    char buf[80];
+#ifdef SYS_CONSOLE
+   sprintf(buf, "/proc/%d/cmdline", 0);
+#else
    sprintf(buf, "/proc/%d/cmdline", getpid());
+#endif
    FILE *cmd = fopen(buf,"rb");
    bool real_arg = 0;
    if (cmd)

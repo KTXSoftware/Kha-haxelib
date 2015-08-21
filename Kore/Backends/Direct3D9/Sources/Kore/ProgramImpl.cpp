@@ -35,7 +35,7 @@ void Program::setTesselationEvaluationShader(Shader* shader) {
 
 void Program::link(const VertexStructure& structure) {
 	int stride = 0;
-	D3DVERTEXELEMENT9* elements = new D3DVERTEXELEMENT9[structure.size + 1];
+	D3DVERTEXELEMENT9* elements = (D3DVERTEXELEMENT9*)alloca(sizeof(D3DVERTEXELEMENT9) * (structure.size + 1));
 	for (int i = 0; i < structure.size; ++i) {
 		elements[i].Stream = 0;
 		elements[i].Offset = stride;
@@ -108,6 +108,7 @@ ConstantLocation Program::getConstantLocation(const char* name) {
 	}
 	else {
 		location.shaderType = -1;
+		log(Warning, "Could not find uniform %s.", name);
 	}
 	return location;
 }
@@ -126,6 +127,7 @@ TextureUnit Program::getTextureUnit(const char* name) {
 	}
 	else {
 		unit.unit = -1;
+		log(Warning, "Could not find texture %s.", name);
 	}
 	return unit;
 }

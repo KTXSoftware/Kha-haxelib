@@ -21,6 +21,7 @@ class WebGLImage extends Image {
 	private var format: TextureFormat;
 	private var renderTarget: Bool;
 	public var frameBuffer: Dynamic;
+	public var renderBuffer: Dynamic;
 	
 	private var graphics1: kha.graphics1.Graphics;
 	private var graphics2: kha.graphics2.Graphics;
@@ -88,7 +89,15 @@ class WebGLImage extends Image {
 			if (context == null) return true;
 			else createImageData();
 		}
-		return (data.data[y * Std.int(image.width) * 4 + x * 4 + 3] != 0);
+		return (data.data[y * Std.int(image.width) * 4 + x * 4 + 3] != 0);		
+	}
+	
+	override public function at(x: Int, y: Int): Color {
+		if (data == null) {
+			if (context == null) return Color.Black;
+			else createImageData();
+		}
+		return Color.fromValue(data.data[y * Std.int(image.width) * 4 + x * 4 + 0]);
 	}
 	
 	function createImageData() {
@@ -128,6 +137,14 @@ class WebGLImage extends Image {
 			Sys.gl.bindFramebuffer(Sys.gl.FRAMEBUFFER, frameBuffer);
 			Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, realWidth, realHeight, 0, Sys.gl.RGBA, format == TextureFormat.RGBA128 ? Sys.gl.FLOAT : Sys.gl.UNSIGNED_BYTE, null);
 			Sys.gl.framebufferTexture2D(Sys.gl.FRAMEBUFFER, Sys.gl.COLOR_ATTACHMENT0, Sys.gl.TEXTURE_2D, texture, 0);
+			
+			// For depth tests
+			renderBuffer = Sys.gl.createRenderbuffer();
+			Sys.gl.bindRenderbuffer(Sys.gl.RENDERBUFFER, renderBuffer);
+			Sys.gl.renderbufferStorage(Sys.gl.RENDERBUFFER, Sys.gl.DEPTH_COMPONENT16, realWidth, realHeight);
+			Sys.gl.framebufferRenderbuffer(Sys.gl.FRAMEBUFFER, Sys.gl.DEPTH_ATTACHMENT, Sys.gl.RENDERBUFFER, renderBuffer);
+			
+			Sys.gl.bindRenderbuffer(Sys.gl.RENDERBUFFER, null);
 			Sys.gl.bindFramebuffer(Sys.gl.FRAMEBUFFER, null);
 		}
 		else if (video != null) Sys.gl.texImage2D(Sys.gl.TEXTURE_2D, 0, Sys.gl.RGBA, Sys.gl.RGBA, Sys.gl.UNSIGNED_BYTE, video);

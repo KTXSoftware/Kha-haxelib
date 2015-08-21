@@ -1,12 +1,14 @@
 package kha.graphics4;
 
-import haxe.io.Float32Array;
+import kha.arrays.Float32Array;
 import kha.Canvas;
 import kha.Color;
+import kha.FastFloat;
 import kha.Font;
 import kha.Image;
 import kha.graphics4.BlendingOperation;
 import kha.graphics4.ConstantLocation;
+import kha.graphics4.CullMode;
 import kha.graphics4.IndexBuffer;
 import kha.graphics4.MipMapFilter;
 import kha.graphics4.Program;
@@ -18,9 +20,12 @@ import kha.graphics4.Usage;
 import kha.graphics4.VertexBuffer;
 import kha.graphics4.VertexData;
 import kha.graphics4.VertexStructure;
+import kha.math.FastMatrix3;
+import kha.math.FastVector2;
 import kha.math.Matrix3;
 import kha.math.Matrix4;
 import kha.math.Vector2;
+import kha.simd.Float32x4;
 
 class ImageShaderPainter {
 	private var projectionMatrix: Matrix4;
@@ -106,64 +111,64 @@ class ImageShaderPainter {
 	}
 	
 	private inline function setRectVertices(
-		bottomleftx: Float, bottomlefty: Float,
-		topleftx: Float, toplefty: Float,
-		toprightx: Float, toprighty: Float,
-		bottomrightx: Float, bottomrighty: Float): Void {
+		bottomleftx: FastFloat, bottomlefty: FastFloat,
+		topleftx: FastFloat, toplefty: FastFloat,
+		toprightx: FastFloat, toprighty: FastFloat,
+		bottomrightx: FastFloat, bottomrighty: FastFloat): Void {
 		var baseIndex: Int = bufferIndex * vertexSize * 4;
-		rectVertices[baseIndex +  0] = bottomleftx;
-		rectVertices[baseIndex +  1] = bottomlefty;
-		rectVertices[baseIndex +  2] = -5.0;
+		rectVertices.set(baseIndex +  0, bottomleftx);
+		rectVertices.set(baseIndex +  1, bottomlefty);
+		rectVertices.set(baseIndex +  2, -5.0);
 		
-		rectVertices[baseIndex +  9] = topleftx;
-		rectVertices[baseIndex + 10] = toplefty;
-		rectVertices[baseIndex + 11] = -5.0;
+		rectVertices.set(baseIndex +  9, topleftx);
+		rectVertices.set(baseIndex + 10, toplefty);
+		rectVertices.set(baseIndex + 11, -5.0);
 		
-		rectVertices[baseIndex + 18] = toprightx;
-		rectVertices[baseIndex + 19] = toprighty;
-		rectVertices[baseIndex + 20] = -5.0;
+		rectVertices.set(baseIndex + 18, toprightx);
+		rectVertices.set(baseIndex + 19, toprighty);
+		rectVertices.set(baseIndex + 20, -5.0);
 		
-		rectVertices[baseIndex + 27] = bottomrightx;
-		rectVertices[baseIndex + 28] = bottomrighty;
-		rectVertices[baseIndex + 29] = -5.0;
+		rectVertices.set(baseIndex + 27, bottomrightx);
+		rectVertices.set(baseIndex + 28, bottomrighty);
+		rectVertices.set(baseIndex + 29, -5.0);
 	}
 	
-	private inline function setRectTexCoords(left: Float, top: Float, right: Float, bottom: Float): Void {
+	private inline function setRectTexCoords(left: FastFloat, top: FastFloat, right: FastFloat, bottom: FastFloat): Void {
 		var baseIndex: Int = bufferIndex * vertexSize * 4;
-		rectVertices[baseIndex +  3] = left;
-		rectVertices[baseIndex +  4] = bottom;
+		rectVertices.set(baseIndex +  3, left);
+		rectVertices.set(baseIndex +  4, bottom);
 		
-		rectVertices[baseIndex + 12] = left;
-		rectVertices[baseIndex + 13] = top;
+		rectVertices.set(baseIndex + 12, left);
+		rectVertices.set(baseIndex + 13, top);
 		
-		rectVertices[baseIndex + 21] = right;
-		rectVertices[baseIndex + 22] = top;
+		rectVertices.set(baseIndex + 21, right);
+		rectVertices.set(baseIndex + 22, top);
 		
-		rectVertices[baseIndex + 30] = right;
-		rectVertices[baseIndex + 31] = bottom;
+		rectVertices.set(baseIndex + 30, right);
+		rectVertices.set(baseIndex + 31, bottom);
 	}
 	
-	private inline function setRectColor(r: Float, g: Float, b: Float, a: Float): Void {
+	private inline function setRectColor(r: FastFloat, g: FastFloat, b: FastFloat, a: FastFloat): Void {
 		var baseIndex: Int = bufferIndex * vertexSize * 4;
-		rectVertices[baseIndex +  5] = r;
-		rectVertices[baseIndex +  6] = g;
-		rectVertices[baseIndex +  7] = b;
-		rectVertices[baseIndex +  8] = a;
+		rectVertices.set(baseIndex +  5, r);
+		rectVertices.set(baseIndex +  6, g);
+		rectVertices.set(baseIndex +  7, b);
+		rectVertices.set(baseIndex +  8, a);
 		
-		rectVertices[baseIndex + 14] = r;
-		rectVertices[baseIndex + 15] = g;
-		rectVertices[baseIndex + 16] = b;
-		rectVertices[baseIndex + 17] = a;
+		rectVertices.set(baseIndex + 14, r);
+		rectVertices.set(baseIndex + 15, g);
+		rectVertices.set(baseIndex + 16, b);
+		rectVertices.set(baseIndex + 17, a);
 		
-		rectVertices[baseIndex + 23] = r;
-		rectVertices[baseIndex + 24] = g;
-		rectVertices[baseIndex + 25] = b;
-		rectVertices[baseIndex + 26] = a;
+		rectVertices.set(baseIndex + 23, r);
+		rectVertices.set(baseIndex + 24, g);
+		rectVertices.set(baseIndex + 25, b);
+		rectVertices.set(baseIndex + 26, a);
 		
-		rectVertices[baseIndex + 32] = r;
-		rectVertices[baseIndex + 33] = g;
-		rectVertices[baseIndex + 34] = b;
-		rectVertices[baseIndex + 35] = a;
+		rectVertices.set(baseIndex + 32, r);
+		rectVertices.set(baseIndex + 33, g);
+		rectVertices.set(baseIndex + 34, b);
+		rectVertices.set(baseIndex + 35, a);
 	}
 
 	private function drawBuffer(): Void {
@@ -194,11 +199,11 @@ class ImageShaderPainter {
 	}
 	
 	public inline function drawImage(img: kha.Image,
-		bottomleftx: Float, bottomlefty: Float,
-		topleftx: Float, toplefty: Float,
-		toprightx: Float, toprighty: Float,
-		bottomrightx: Float, bottomrighty: Float,
-		opacity: Float, color: Color): Void {
+		bottomleftx: FastFloat, bottomlefty: FastFloat,
+		topleftx: FastFloat, toplefty: FastFloat,
+		toprightx: FastFloat, toprighty: FastFloat,
+		bottomrightx: FastFloat, bottomrighty: FastFloat,
+		opacity: FastFloat, color: Color): Void {
 		var tex = img;
 		if (bufferIndex + 1 >= bufferSize || (lastTexture != null && tex != lastTexture)) drawBuffer();
 		
@@ -210,12 +215,12 @@ class ImageShaderPainter {
 		lastTexture = tex;
 	}
 	
-	public inline function drawImage2(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float,
-		bottomleftx: Float, bottomlefty: Float,
-		topleftx: Float, toplefty: Float,
-		toprightx: Float, toprighty: Float,
-		bottomrightx: Float, bottomrighty: Float,
-		opacity: Float, color: Color): Void {
+	public inline function drawImage2(img: kha.Image, sx: FastFloat, sy: FastFloat, sw: FastFloat, sh: FastFloat,
+		bottomleftx: FastFloat, bottomlefty: FastFloat,
+		topleftx: FastFloat, toplefty: FastFloat,
+		toprightx: FastFloat, toprighty: FastFloat,
+		bottomrightx: FastFloat, bottomrighty: FastFloat,
+		opacity: FastFloat, color: Color): Void {
 		var tex = img;
 		if (bufferIndex + 1 >= bufferSize || (lastTexture != null && tex != lastTexture)) drawBuffer();
 		
@@ -227,7 +232,7 @@ class ImageShaderPainter {
 		lastTexture = tex;
 	}
 	
-	public inline function drawImageScale(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float, left: Float, top: Float, right: Float, bottom: Float, opacity: Float, color: Color): Void {
+	public inline function drawImageScale(img: kha.Image, sx: FastFloat, sy: FastFloat, sw: FastFloat, sh: FastFloat, left: FastFloat, top: FastFloat, right: FastFloat, bottom: FastFloat, opacity: FastFloat, color: Color): Void {
 		var tex = img;
 		if (bufferIndex + 1 >= bufferSize || (lastTexture != null && tex != lastTexture)) drawBuffer();
 		
@@ -347,77 +352,77 @@ class ColoredShaderPainter {
 		toprightx: Float, toprighty: Float,
 		bottomrightx: Float, bottomrighty: Float): Void {
 		var baseIndex: Int = bufferIndex * 7 * 4;
-		rectVertices[baseIndex +  0] = bottomleftx;
-		rectVertices[baseIndex +  1] = bottomlefty;
-		rectVertices[baseIndex +  2] = -5.0;
+		rectVertices.set(baseIndex +  0, bottomleftx);
+		rectVertices.set(baseIndex +  1, bottomlefty);
+		rectVertices.set(baseIndex +  2, -5.0);
 		
-		rectVertices[baseIndex +  7] = topleftx;
-		rectVertices[baseIndex +  8] = toplefty;
-		rectVertices[baseIndex +  9] = -5.0;
+		rectVertices.set(baseIndex +  7, topleftx);
+		rectVertices.set(baseIndex +  8, toplefty);
+		rectVertices.set(baseIndex +  9, -5.0);
 		
-		rectVertices[baseIndex + 14] = toprightx;
-		rectVertices[baseIndex + 15] = toprighty;
-		rectVertices[baseIndex + 16] = -5.0;
+		rectVertices.set(baseIndex + 14, toprightx);
+		rectVertices.set(baseIndex + 15, toprighty);
+		rectVertices.set(baseIndex + 16, -5.0);
 		
-		rectVertices[baseIndex + 21] = bottomrightx;
-		rectVertices[baseIndex + 22] = bottomrighty;
-		rectVertices[baseIndex + 23] = -5.0;
+		rectVertices.set(baseIndex + 21, bottomrightx);
+		rectVertices.set(baseIndex + 22, bottomrighty);
+		rectVertices.set(baseIndex + 23, -5.0);
 	}
 	
 	public function setRectColors(color: Color): Void {
 		var baseIndex: Int = bufferIndex * 7 * 4;
-		rectVertices[baseIndex +  3] = color.R;
-		rectVertices[baseIndex +  4] = color.G;
-		rectVertices[baseIndex +  5] = color.B;
-		rectVertices[baseIndex +  6] = color.A;
+		rectVertices.set(baseIndex +  3, color.R);
+		rectVertices.set(baseIndex +  4, color.G);
+		rectVertices.set(baseIndex +  5, color.B);
+		rectVertices.set(baseIndex +  6, color.A);
 		
-		rectVertices[baseIndex + 10] = color.R;
-		rectVertices[baseIndex + 11] = color.G;
-		rectVertices[baseIndex + 12] = color.B;
-		rectVertices[baseIndex + 13] = color.A;
+		rectVertices.set(baseIndex + 10, color.R);
+		rectVertices.set(baseIndex + 11, color.G);
+		rectVertices.set(baseIndex + 12, color.B);
+		rectVertices.set(baseIndex + 13, color.A);
 		
-		rectVertices[baseIndex + 17] = color.R;
-		rectVertices[baseIndex + 18] = color.G;
-		rectVertices[baseIndex + 19] = color.B;
-		rectVertices[baseIndex + 20] = color.A;
+		rectVertices.set(baseIndex + 17, color.R);
+		rectVertices.set(baseIndex + 18, color.G);
+		rectVertices.set(baseIndex + 19, color.B);
+		rectVertices.set(baseIndex + 20, color.A);
 		
-		rectVertices[baseIndex + 24] = color.R;
-		rectVertices[baseIndex + 25] = color.G;
-		rectVertices[baseIndex + 26] = color.B;
-		rectVertices[baseIndex + 27] = color.A;
+		rectVertices.set(baseIndex + 24, color.R);
+		rectVertices.set(baseIndex + 25, color.G);
+		rectVertices.set(baseIndex + 26, color.B);
+		rectVertices.set(baseIndex + 27, color.A);
 	}
 	
 	private function setTriVertices(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Void {
 		var baseIndex: Int = triangleBufferIndex * 7 * 3;
-		triangleVertices[baseIndex +  0] = x1;
-		triangleVertices[baseIndex +  1] = y1;
-		triangleVertices[baseIndex +  2] = -5.0;
+		triangleVertices.set(baseIndex +  0, x1);
+		triangleVertices.set(baseIndex +  1, y1);
+		triangleVertices.set(baseIndex +  2, -5.0);
 		
-		triangleVertices[baseIndex +  7] = x2;
-		triangleVertices[baseIndex +  8] = y2;
-		triangleVertices[baseIndex +  9] = -5.0;
+		triangleVertices.set(baseIndex +  7, x2);
+		triangleVertices.set(baseIndex +  8, y2);
+		triangleVertices.set(baseIndex +  9, -5.0);
 		
-		triangleVertices[baseIndex + 14] = x3;
-		triangleVertices[baseIndex + 15] = y3;
-		triangleVertices[baseIndex + 16] = -5.0;
+		triangleVertices.set(baseIndex + 14, x3);
+		triangleVertices.set(baseIndex + 15, y3);
+		triangleVertices.set(baseIndex + 16, -5.0);
 	}
 	
 	private function setTriColors(color: Color): Void {
 		var baseIndex: Int = triangleBufferIndex * 7 * 3;
-		triangleVertices[baseIndex +  3] = color.R;
-		triangleVertices[baseIndex +  4] = color.G;
-		triangleVertices[baseIndex +  5] = color.B;
-		triangleVertices[baseIndex +  6] = color.A;
+		triangleVertices.set(baseIndex +  3, color.R);
+		triangleVertices.set(baseIndex +  4, color.G);
+		triangleVertices.set(baseIndex +  5, color.B);
+		triangleVertices.set(baseIndex +  6, color.A);
 		
-		triangleVertices[baseIndex + 10] = color.R;
-		triangleVertices[baseIndex + 11] = color.G;
-		triangleVertices[baseIndex + 12] = color.B;
-		triangleVertices[baseIndex + 13] = color.A;
+		triangleVertices.set(baseIndex + 10, color.R);
+		triangleVertices.set(baseIndex + 11, color.G);
+		triangleVertices.set(baseIndex + 12, color.B);
+		triangleVertices.set(baseIndex + 13, color.A);
 		
-		triangleVertices[baseIndex + 17] = color.R;
-		triangleVertices[baseIndex + 18] = color.G;
-		triangleVertices[baseIndex + 19] = color.B;
-		triangleVertices[baseIndex + 20] = color.A;
+		triangleVertices.set(baseIndex + 17, color.R);
+		triangleVertices.set(baseIndex + 18, color.G);
+		triangleVertices.set(baseIndex + 19, color.B);
+		triangleVertices.set(baseIndex + 20, color.A);
 	}
 
 	private function drawBuffer(trisDone: Bool): Void {
@@ -482,15 +487,15 @@ class ColoredShaderPainter {
 		++triangleBufferIndex;
 	}
 	
-	public function endTris(rectsDone: Bool): Void {
+	public inline function endTris(rectsDone: Bool): Void {
 		if (triangleBufferIndex > 0) drawTriBuffer(rectsDone);
 	}
 	
-	public function endRects(trisDone: Bool): Void {
+	public inline function endRects(trisDone: Bool): Void {
 		if (bufferIndex > 0) drawBuffer(trisDone);
 	}
 	
-	public function end(): Void {
+	public inline function end(): Void {
 		endTris(false);
 		endRects(false);
 	}
@@ -587,59 +592,59 @@ class TextShaderPainter {
 		toprightx: Float, toprighty: Float,
 		bottomrightx: Float, bottomrighty: Float): Void {
 		var baseIndex: Int = bufferIndex * 9 * 4;
-		rectVertices[baseIndex +  0] = bottomleftx;
-		rectVertices[baseIndex +  1] = bottomlefty;
-		rectVertices[baseIndex +  2] = -5.0;
+		rectVertices.set(baseIndex +  0, bottomleftx);
+		rectVertices.set(baseIndex +  1, bottomlefty);
+		rectVertices.set(baseIndex +  2, -5.0);
 		
-		rectVertices[baseIndex +  9] = topleftx;
-		rectVertices[baseIndex + 10] = toplefty;
-		rectVertices[baseIndex + 11] = -5.0;
+		rectVertices.set(baseIndex +  9, topleftx);
+		rectVertices.set(baseIndex + 10, toplefty);
+		rectVertices.set(baseIndex + 11, -5.0);
 		
-		rectVertices[baseIndex + 18] = toprightx;
-		rectVertices[baseIndex + 19] = toprighty;
-		rectVertices[baseIndex + 20] = -5.0;
+		rectVertices.set(baseIndex + 18, toprightx);
+		rectVertices.set(baseIndex + 19, toprighty);
+		rectVertices.set(baseIndex + 20, -5.0);
 		
-		rectVertices[baseIndex + 27] = bottomrightx;
-		rectVertices[baseIndex + 28] = bottomrighty;
-		rectVertices[baseIndex + 29] = -5.0;
+		rectVertices.set(baseIndex + 27, bottomrightx);
+		rectVertices.set(baseIndex + 28, bottomrighty);
+		rectVertices.set(baseIndex + 29, -5.0);
 	}
 	
 	private function setRectTexCoords(left: Float, top: Float, right: Float, bottom: Float): Void {
 		var baseIndex: Int = bufferIndex * 9 * 4;
-		rectVertices[baseIndex +  3] = left;
-		rectVertices[baseIndex +  4] = bottom;
+		rectVertices.set(baseIndex +  3, left);
+		rectVertices.set(baseIndex +  4, bottom);
 		
-		rectVertices[baseIndex + 12] = left;
-		rectVertices[baseIndex + 13] = top;
+		rectVertices.set(baseIndex + 12, left);
+		rectVertices.set(baseIndex + 13, top);
 		
-		rectVertices[baseIndex + 21] = right;
-		rectVertices[baseIndex + 22] = top;
+		rectVertices.set(baseIndex + 21, right);
+		rectVertices.set(baseIndex + 22, top);
 		
-		rectVertices[baseIndex + 30] = right;
-		rectVertices[baseIndex + 31] = bottom;
+		rectVertices.set(baseIndex + 30, right);
+		rectVertices.set(baseIndex + 31, bottom);
 	}
 	
 	private function setRectColors(color: Color): Void {
 		var baseIndex: Int = bufferIndex * 9 * 4;
-		rectVertices[baseIndex +  5] = color.R;
-		rectVertices[baseIndex +  6] = color.G;
-		rectVertices[baseIndex +  7] = color.B;
-		rectVertices[baseIndex +  8] = color.A;
+		rectVertices.set(baseIndex +  5, color.R);
+		rectVertices.set(baseIndex +  6, color.G);
+		rectVertices.set(baseIndex +  7, color.B);
+		rectVertices.set(baseIndex +  8, color.A);
 		
-		rectVertices[baseIndex + 14] = color.R;
-		rectVertices[baseIndex + 15] = color.G;
-		rectVertices[baseIndex + 16] = color.B;
-		rectVertices[baseIndex + 17] = color.A;
+		rectVertices.set(baseIndex + 14, color.R);
+		rectVertices.set(baseIndex + 15, color.G);
+		rectVertices.set(baseIndex + 16, color.B);
+		rectVertices.set(baseIndex + 17, color.A);
 		
-		rectVertices[baseIndex + 23] = color.R;
-		rectVertices[baseIndex + 24] = color.G;
-		rectVertices[baseIndex + 25] = color.B;
-		rectVertices[baseIndex + 26] = color.A;
+		rectVertices.set(baseIndex + 23, color.R);
+		rectVertices.set(baseIndex + 24, color.G);
+		rectVertices.set(baseIndex + 25, color.B);
+		rectVertices.set(baseIndex + 26, color.A);
 		
-		rectVertices[baseIndex + 32] = color.R;
-		rectVertices[baseIndex + 33] = color.G;
-		rectVertices[baseIndex + 34] = color.B;
-		rectVertices[baseIndex + 35] = color.A;
+		rectVertices.set(baseIndex + 32, color.R);
+		rectVertices.set(baseIndex + 33, color.G);
+		rectVertices.set(baseIndex + 34, color.B);
+		rectVertices.set(baseIndex + 35, color.A);
 	}
 	
 	private function drawBuffer(): Void {
@@ -705,7 +710,7 @@ class TextShaderPainter {
 		text = null;
 	}
 	
-	public function drawString(text: String, color: Color, x: Float, y: Float, transformation: Matrix3): Void {
+	public function drawString(text: String, color: Color, x: Float, y: Float, transformation: FastMatrix3): Void {
 		var tex = font.getTexture();
 		if (lastTexture != null && tex != lastTexture) drawBuffer();
 		lastTexture = tex;
@@ -719,10 +724,10 @@ class TextShaderPainter {
 				if (bufferIndex + 1 >= bufferSize) drawBuffer();
 				setRectColors(color);
 				setRectTexCoords(q.s0 * tex.width / tex.realWidth, q.t0 * tex.height / tex.realHeight, q.s1 * tex.width / tex.realWidth, q.t1 * tex.height / tex.realHeight);
-				var p0 = transformation.multvec(new Vector2(q.x0, q.y1)); //bottom-left
-				var p1 = transformation.multvec(new Vector2(q.x0, q.y0)); //top-left
-				var p2 = transformation.multvec(new Vector2(q.x1, q.y0)); //top-right
-				var p3 = transformation.multvec(new Vector2(q.x1, q.y1)); //bottom-right
+				var p0 = transformation.multvec(new FastVector2(q.x0, q.y1)); //bottom-left
+				var p1 = transformation.multvec(new FastVector2(q.x0, q.y0)); //top-left
+				var p2 = transformation.multvec(new FastVector2(q.x1, q.y0)); //top-right
+				var p3 = transformation.multvec(new FastVector2(q.x1, q.y1)); //bottom-right
 				setRectVertices(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
 				xpos += q.xadvance;
 				++bufferIndex;
@@ -805,25 +810,55 @@ class Graphics2 extends kha.graphics2.Graphics {
 		textPainter.setProjection(projectionMatrix);
 	}
 	
-	public override function drawImage(img: kha.Image, x: Float, y: Float): Void {
+	#if cpp
+	public override function drawImage(img: kha.Image, x: FastFloat, y: FastFloat): Void {
 		coloredPainter.end();
 		textPainter.end();
-		var xw = x + img.width;
-		var yh = y + img.height;
-		var p1 = transformation.multvec(new Vector2(x, yh));
-		var p2 = transformation.multvec(new Vector2(x, y));
-		var p3 = transformation.multvec(new Vector2(xw, y));
-		var p4 = transformation.multvec(new Vector2(xw, yh));
+		var xw: FastFloat = x + img.width;
+		var yh: FastFloat = y + img.height;
+		
+		var xx = Float32x4.loadFast(x, x, xw, xw);
+		var yy = Float32x4.loadFast(yh, y, y, yh);
+		
+		var _00 = Float32x4.loadAllFast(transformation._00);
+		var _01 = Float32x4.loadAllFast(transformation._01);
+		var _02 = Float32x4.loadAllFast(transformation._02);
+		var _10 = Float32x4.loadAllFast(transformation._10);
+		var _11 = Float32x4.loadAllFast(transformation._11);
+		var _12 = Float32x4.loadAllFast(transformation._12);
+		var _20 = Float32x4.loadAllFast(transformation._20);
+		var _21 = Float32x4.loadAllFast(transformation._21);
+		var _22 = Float32x4.loadAllFast(transformation._22);
+		
+		// matrix multiply
+		var w = Float32x4.add(Float32x4.add(Float32x4.mul(_02, xx), Float32x4.mul(_12, yy)), _22);
+		var px = Float32x4.div(Float32x4.add(Float32x4.add(Float32x4.mul(_00, xx), Float32x4.mul(_10, yy)), _20), w);
+		var py = Float32x4.div(Float32x4.add(Float32x4.add(Float32x4.mul(_01, xx), Float32x4.mul(_11, yy)), _21), w);
+		
+		imagePainter.drawImage(img, Float32x4.get(px, 0), Float32x4.get(py, 0), Float32x4.get(px, 1), Float32x4.get(py, 1),
+			Float32x4.get(px, 2), Float32x4.get(py, 2), Float32x4.get(px, 3), Float32x4.get(py, 3), opacity, this.color);
+	}
+	#else
+	public override function drawImage(img: kha.Image, x: FastFloat, y: FastFloat): Void {
+		coloredPainter.end();
+		textPainter.end();
+		var xw: FastFloat = x + img.width;
+		var yh: FastFloat = y + img.height;
+		var p1 = transformation.multvec(new FastVector2(x, yh));
+		var p2 = transformation.multvec(new FastVector2(x, y));
+		var p3 = transformation.multvec(new FastVector2(xw, y));
+		var p4 = transformation.multvec(new FastVector2(xw, yh));
 		imagePainter.drawImage(img, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, opacity, this.color);
 	}
+	#end
 	
-	public override function drawScaledSubImage(img: kha.Image, sx: Float, sy: Float, sw: Float, sh: Float, dx: Float, dy: Float, dw: Float, dh: Float): Void {
+	public override function drawScaledSubImage(img: kha.Image, sx: FastFloat, sy: FastFloat, sw: FastFloat, sh: FastFloat, dx: FastFloat, dy: FastFloat, dw: FastFloat, dh: FastFloat): Void {
 		coloredPainter.end();
 		textPainter.end();
-		var p1 = transformation.multvec(new Vector2(dx, dy + dh));
-		var p2 = transformation.multvec(new Vector2(dx, dy));
-		var p3 = transformation.multvec(new Vector2(dx + dw, dy));
-		var p4 = transformation.multvec(new Vector2(dx + dw, dy + dh));
+		var p1 = transformation.multvec(new FastVector2(dx, dy + dh));
+		var p2 = transformation.multvec(new FastVector2(dx, dy));
+		var p3 = transformation.multvec(new FastVector2(dx + dw, dy));
+		var p4 = transformation.multvec(new FastVector2(dx + dw, dy + dh));
 		imagePainter.drawImage2(img, sx, sy, sw, sh, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, opacity, this.color);
 	}
 	
@@ -839,26 +874,26 @@ class Graphics2 extends kha.graphics2.Graphics {
 		imagePainter.end();
 		textPainter.end();
 		
-		var p1 = transformation.multvec(new Vector2(x - strength / 2, y + strength / 2)); //bottom-left
-		var p2 = transformation.multvec(new Vector2(x - strength / 2, y - strength / 2)); //top-left
-		var p3 = transformation.multvec(new Vector2(x + width + strength / 2, y - strength / 2)); //top-right
-		var p4 = transformation.multvec(new Vector2(x + width + strength / 2, y + strength / 2)); //bottom-right
+		var p1 = transformation.multvec(new FastVector2(x - strength / 2, y + strength / 2)); //bottom-left
+		var p2 = transformation.multvec(new FastVector2(x - strength / 2, y - strength / 2)); //top-left
+		var p3 = transformation.multvec(new FastVector2(x + width + strength / 2, y - strength / 2)); //top-right
+		var p4 = transformation.multvec(new FastVector2(x + width + strength / 2, y + strength / 2)); //bottom-right
 		coloredPainter.fillRect(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y); // top
 		
-		p1 = transformation.multvec(new Vector2(x - strength / 2, y + height + strength / 2));
-		p3 = transformation.multvec(new Vector2(x + strength / 2, y - strength / 2));
-		p4 = transformation.multvec(new Vector2(x + strength / 2, y + height + strength / 2));
+		p1 = transformation.multvec(new FastVector2(x - strength / 2, y + height + strength / 2));
+		p3 = transformation.multvec(new FastVector2(x + strength / 2, y - strength / 2));
+		p4 = transformation.multvec(new FastVector2(x + strength / 2, y + height + strength / 2));
 		coloredPainter.fillRect(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y); // left
 		
-		p2 = transformation.multvec(new Vector2(x - strength / 2, y + height - strength / 2));
-		p3 = transformation.multvec(new Vector2(x + width + strength / 2, y + height - strength / 2));
-		p4 = transformation.multvec(new Vector2(x + width + strength / 2, y + height + strength / 2));
+		p2 = transformation.multvec(new FastVector2(x - strength / 2, y + height - strength / 2));
+		p3 = transformation.multvec(new FastVector2(x + width + strength / 2, y + height - strength / 2));
+		p4 = transformation.multvec(new FastVector2(x + width + strength / 2, y + height + strength / 2));
 		coloredPainter.fillRect(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y); // bottom
 		
-		p1 = transformation.multvec(new Vector2(x + width - strength / 2, y + height + strength / 2));
-		p2 = transformation.multvec(new Vector2(x + width - strength / 2, y - strength / 2));
-		p3 = transformation.multvec(new Vector2(x + width + strength / 2, y - strength / 2));
-		p4 = transformation.multvec(new Vector2(x + width + strength / 2, y + height + strength / 2));
+		p1 = transformation.multvec(new FastVector2(x + width - strength / 2, y + height + strength / 2));
+		p2 = transformation.multvec(new FastVector2(x + width - strength / 2, y - strength / 2));
+		p3 = transformation.multvec(new FastVector2(x + width + strength / 2, y - strength / 2));
+		p4 = transformation.multvec(new FastVector2(x + width + strength / 2, y + height + strength / 2));
 		coloredPainter.fillRect(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y); // right
 	}
 	
@@ -866,10 +901,10 @@ class Graphics2 extends kha.graphics2.Graphics {
 		imagePainter.end();
 		textPainter.end();
 		
-		var p1 = transformation.multvec(new Vector2(x, y + height));
-		var p2 = transformation.multvec(new Vector2(x, y));
-		var p3 = transformation.multvec(new Vector2(x + width, y));
-		var p4 = transformation.multvec(new Vector2(x + width, y + height));
+		var p1 = transformation.multvec(new FastVector2(x, y + height));
+		var p2 = transformation.multvec(new FastVector2(x, y));
+		var p3 = transformation.multvec(new FastVector2(x + width, y));
+		var p4 = transformation.multvec(new FastVector2(x + width, y + height));
 		coloredPainter.fillRect(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y);
 	}
 
@@ -893,12 +928,12 @@ class Graphics2 extends kha.graphics2.Graphics {
 		imagePainter.end();
 		textPainter.end();
 		
-		var vec: Vector2;
-		if (y2 == y1) vec = new Vector2(0, -1);
-		else vec = new Vector2(1, -(x2 - x1) / (y2 - y1));
+		var vec: FastVector2;
+		if (y2 == y1) vec = new FastVector2(0, -1);
+		else vec = new FastVector2(1, -(x2 - x1) / (y2 - y1));
 		vec.length = strength;
-		var p1 = new Vector2(x1 + 0.5 * vec.x, y1 + 0.5 * vec.y);
-		var p2 = new Vector2(x2 + 0.5 * vec.x, y2 + 0.5 * vec.y);
+		var p1 = new FastVector2(x1 + 0.5 * vec.x, y1 + 0.5 * vec.y);
+		var p2 = new FastVector2(x2 + 0.5 * vec.x, y2 + 0.5 * vec.y);
 		var p3 = p1.sub(vec);
 		var p4 = p2.sub(vec);
 		
@@ -915,9 +950,9 @@ class Graphics2 extends kha.graphics2.Graphics {
 		imagePainter.end();
 		textPainter.end();
 		
-		var p1 = transformation.multvec(new Vector2(x1, y1));
-		var p2 = transformation.multvec(new Vector2(x2, y2));
-		var p3 = transformation.multvec(new Vector2(x3, y3));
+		var p1 = transformation.multvec(new FastVector2(x1, y1));
+		var p2 = transformation.multvec(new FastVector2(x2, y2));
+		var p3 = transformation.multvec(new FastVector2(x3, y3));
 		coloredPainter.fillTriangle(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
 	}
 	
@@ -926,7 +961,7 @@ class Graphics2 extends kha.graphics2.Graphics {
 	}
 	
 	override private function setProgram(program: Program): Void {
-		endDrawing();
+		flush();
 		imagePainter.program = program;
 		coloredPainter.program = program;
 		textPainter.program = program;
@@ -934,7 +969,7 @@ class Graphics2 extends kha.graphics2.Graphics {
 	}
 	
 	override public function setBlendingMode(source: BlendingOperation, destination: BlendingOperation): Void {
-		endDrawing();
+		flush();
 		imagePainter.sourceBlend = source;
 		imagePainter.destinationBlend = destination;
 		coloredPainter.sourceBlend = source;
@@ -947,20 +982,21 @@ class Graphics2 extends kha.graphics2.Graphics {
 		g.begin();
 		if (clear) this.clear(clearColor);
 		setProjection();
+		g.setCullMode(CullMode.None);
 	}
 	
 	override public function clear(color: Color = null): Void {
 		g.clear(color == null ? Color.Black : color);
 	}
 	
-	private function endDrawing(): Void {
+	public override function flush(): Void {
 		imagePainter.end();
 		textPainter.end();
 		coloredPainter.end();
 	}
 	
 	public override function end(): Void {
-		endDrawing();
+		flush();
 		g.end();
 	}
 	
