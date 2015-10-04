@@ -7,9 +7,13 @@
 
 using namespace Kore;
 
+namespace {
+	const int multiple = 100;
+}
+
 VertexBufferImpl* VertexBufferImpl::_current = nullptr;
 
-VertexBufferImpl::VertexBufferImpl(int count) : myCount(count) {
+VertexBufferImpl::VertexBufferImpl(int count) : myCount(count), currentIndex(0) {
 	
 }
 
@@ -37,39 +41,21 @@ VertexBuffer::VertexBuffer(int count, const VertexStructure& structure) : Vertex
 		}
 	}
 
-	/*
-	vertices = new float[myStride / 4 * myCount];
+	static const int uploadBufferSize = myStride * myCount;
 
-	affirm(device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(myStride * myCount),
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
-		IID_PPV_ARGS(&vb)));
+	device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize * multiple),
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&uploadBuffer));
 
-	affirm(device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(myStride * myCount),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&vbUpload)));
+	//device_->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES (D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+	//	D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&vertexBuffer));
 
-	vb->SetName(L"Vertex Buffer Resource");
-	vbUpload->SetName(L"Vertex Buffer Upload Resource");
-	*/
-
-	affirm(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(myStride * myCount), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vb)));
-	
-	view.BufferLocation = vb->GetGPUVirtualAddress();
+	view.BufferLocation = uploadBuffer->GetGPUVirtualAddress();
+	view.SizeInBytes = uploadBufferSize;
 	view.StrideInBytes = myStride;
-	view.SizeInBytes = myStride * myCount;
 }
 
 VertexBuffer::~VertexBuffer() {
-	vb->Release();
+	//vb->Release();
 	//delete[] vertices;
 }
 
@@ -78,26 +64,32 @@ float* VertexBuffer::lock() {
 }
 
 float* VertexBuffer::lock(int start, int count) {
-	//return &vertices[start * myStride / 4];
-	
-	float* data;
-	affirm(vb->Map(0, nullptr, reinterpret_cast<void**>(&data)));
-	return data;
+	void* p;
+	D3D12_RANGE range;
+	range.Begin = currentIndex * myCount * myStride;
+	range.End = range.Begin + myCount * myStride;
+	uploadBuffer->Map(0, &range, &p);
+	byte* bytes = (byte*)p;
+	bytes += currentIndex * myCount * myStride;
+	return (float*)bytes;
 }
 
 void VertexBuffer::unlock() {
-	//context->UpdateSubresource(vb, 0, nullptr, vertices, 0, 0);
-	/*
-	D3D12_SUBRESOURCE_DATA vertexData = {};
-	vertexData.pData = (void*)vertices;
-	vertexData.RowPitch = myStride * myCount;
-	vertexData.SlicePitch = vertexData.RowPitch;
+	D3D12_RANGE range;
+	range.Begin = currentIndex * myCount * myStride;
+	range.End = range.Begin + myCount * myStride;
+	uploadBuffer->Unmap(0, &range);
 
-	UpdateSubresources(commandList, vb, vbUpload, 0, 0, 1, &vertexData);
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vb, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
-	*/
-
-	vb->Unmap(0, nullptr);
+	view.BufferLocation = uploadBuffer->GetGPUVirtualAddress() + currentIndex * myCount * myStride;
+	
+	++currentIndex;
+	if (currentIndex >= multiple) {
+		currentIndex = 0;
+	}
+	
+	//commandList->CopyBufferRegion(vertexBuffer, 0, uploadBuffer, 0, count() * stride());
+	//CD3DX12_RESOURCE_BARRIER barriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER) };
+	//commandList->ResourceBarrier(1, barriers);
 }
 
 void VertexBuffer::set() {

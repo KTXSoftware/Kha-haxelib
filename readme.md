@@ -1,8 +1,7 @@
 [![Build Status](https://travis-ci.org/KTXSoftware/Kha.svg?branch=master)](https://travis-ci.org/KTXSoftware/Kha) [![Build status](https://ci.appveyor.com/api/projects/status/qk7bx2l38ch2t1pr?svg=true)](https://ci.appveyor.com/project/RobDangerous/kha) [![Stories in Ready](https://badge.waffle.io/KTXSoftware/Kha.png?label=ready&title=Ready)](https://waffle.io/KTXSoftware/Kha)
 ##Kha
 
-Kha is a low level SDK for building games and media applications in a portable way, based on Haxe and GLSL.
-With Kha you can build applications and games that run with native performance in different target devices.
+Kha is a low level SDK for building games and media applications in a very portable and very performant way, based on Haxe and GLSL.
 
 # Index
 - [About](#about)
@@ -27,9 +26,9 @@ gets the best out of every target, supporting super fast 2D graphics just as wel
 The main development is held by [Robert Konrad](http://tech.ktxsoftware.com/)
 
 Things you can do now:
-* Why not following me on [Twitter](https://twitter.com/robdangerous)?
-* You can check out the [examples](https://github.com/KTXSoftware/Kha/wiki/Examples)!
-* Also why not reading the [wiki](https://github.com/KTXSoftware/Kha/wiki/)?
+* Follow Robert on [Twitter](https://twitter.com/robdangerous)?
+* Check out the [examples](https://github.com/KTXSoftware/Kha/wiki/Examples)!
+* Read the [wiki](https://github.com/KTXSoftware/Kha/wiki/)?
 
 <a name="#features"></a>
 ##Features
@@ -40,13 +39,13 @@ Things you can do now:
 * Generational audio API design
 * Support super fast 2D graphics
 * Support high end 3D graphics
-* Can sun on top of other game engines
-* Support GLSL shaders
+* Can run on top of other game engines
+* Write shaders in GLSL - cross-compiles to other shading-lanugages
 
 
 ***Even more Features***
 * Kha apps can also be compiled to C# or Java libraries
-* Only one way to do things
+* One API for all targets
 * No legacy code
 * Support for VR technology
 * Networking multiplayer support
@@ -64,7 +63,9 @@ Things you can do now:
 * Unity 3D
 * PlayStation Vita (PlayStationMobile)
 * Xbox 360 (XNA)
+* Potential (modern) console/handheld support\*
 
+\* Console support is only feasible if an official SDK is provided. With the SDK a new backend can be written. If you have a console SDK and want to help make this possible, contact Robert Konrad!
 
 ![Game](http://robdangero.us/wwx2015/slide40.png)
 
@@ -110,7 +111,7 @@ git clone --recursive https://github.com/KTXSoftware/Empty.git
 
 ***Updating Kha***
 
-If you want to update the Kha and it's submodules in your repository you can do it with just this command!
+If you want to update Kha and its submodules in your repository you can do it with just this command!
 
 <pre lang="bash">
 git submodule foreach --recursive git pull origin master
@@ -119,15 +120,15 @@ git submodule foreach --recursive git pull origin master
 
 <a name="games"></a>
 ## Games made with Kha
-Kha is still the new in the school but it got already a few toys!
+Kha Is relatively new but the community is already publishing games:
 
 [![Game](http://i.imgur.com/I2L3y2e.png)][game1]
 
 
 <a name="engines"></a>
-## Engines using with Kha
-In addition to making games Kha has been used as well for a few game engines!
-So if Kha is still too low level for you, or you are used to another engine check our list and you may find one that fit your needs!
+## Game frameworks with Kha
+Kha already has a few game frameworks build on top of it.
+So if Kha is still too low level for you or you are used to another framework check our list and you may find one that fits your needs!
 
 - [KhaPunk]: Port of HaxePunk/FlashPunk to Kha.
 - [ZBlend]: 3D game engine that integrates into Blender.

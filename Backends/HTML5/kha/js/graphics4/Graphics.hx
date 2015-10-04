@@ -32,17 +32,14 @@ class Graphics implements kha.graphics4.Graphics {
 	private var renderTarget: WebGLImage;
 	private var instancedExtension: Dynamic;
 	
-	public function new(webgl: Bool, renderTarget: WebGLImage = null) {
+	public function new(renderTarget: WebGLImage = null) {
 		this.renderTarget = renderTarget;
-		if (webgl) {
-			Sys.gl.enable(Sys.gl.BLEND);
-			Sys.gl.blendFunc(Sys.gl.SRC_ALPHA, Sys.gl.ONE_MINUS_SRC_ALPHA);
-			Sys.gl.viewport(0, 0, Sys.pixelWidth, Sys.pixelHeight);
-			instancedExtension = Sys.gl.getExtension("ANGLE_instanced_arrays");
-		}
+		instancedExtension = Sys.gl.getExtension("ANGLE_instanced_arrays");
 	}
 
 	public function begin(): Void {
+		Sys.gl.enable(Sys.gl.BLEND);
+		Sys.gl.blendFunc(Sys.gl.SRC_ALPHA, Sys.gl.ONE_MINUS_SRC_ALPHA);
 		if (renderTarget == null) {
 			Sys.gl.bindFramebuffer(Sys.gl.FRAMEBUFFER, null);
 			Sys.gl.viewport(0, 0, Sys.pixelWidth, Sys.pixelHeight);
@@ -83,6 +80,10 @@ class Graphics implements kha.graphics4.Graphics {
 			clearMask |= Sys.gl.STENCIL_BUFFER_BIT;
 		}
 		Sys.gl.clear(clearMask);
+	}
+
+	public function viewport(x : Int, y : Int, width : Int, height : Int): Void{
+		Sys.gl.viewport(x,y,width,height);
 	}
 	
 	public function setDepthMode(write: Bool, mode: CompareMode): Void {
@@ -178,6 +179,16 @@ class Graphics implements kha.graphics4.Graphics {
 		}
 		else {
 			cast(texture, WebGLImage).set(cast(stage, TextureUnit).value);
+		}
+	}
+
+	public function setVideoTexture(unit: kha.graphics4.TextureUnit, texture: kha.Video): Void {
+		if (texture == null) {
+			Sys.gl.activeTexture(Sys.gl.TEXTURE0 + cast(unit, TextureUnit).value);
+			Sys.gl.bindTexture(Sys.gl.TEXTURE_2D, null);
+		}
+		else {
+			cast(cast(texture, kha.js.Video).texture, WebGLImage).set(cast(unit, TextureUnit).value);
 		}
 	}
 	

@@ -31,6 +31,19 @@ void ProgramImpl::setConstants() {
 		context->DSSetConstantBuffers(0, 1, &currentProgram->tessEvalConstantBuffer);
 	}
 	*/
+
+	u8* data;
+	constantBuffers[currentBackBuffer]->Map(0, nullptr, (void**)&data);
+	memcpy(data, vertexConstants, sizeof(vertexConstants));
+	memcpy(data + sizeof(vertexConstants), fragmentConstants, sizeof(fragmentConstants));
+	constantBuffers[currentBackBuffer]->Unmap(0, nullptr);
+
+	commandList->SetPipelineState(_current->pso);
+	commandList->SetGraphicsRootSignature(rootSignature);
+
+	TextureImpl::setTextures();
+
+	commandList->SetGraphicsRootConstantBufferView(1, constantBuffers[currentBackBuffer]->GetGPUVirtualAddress());
 }
 
 ProgramImpl::ProgramImpl() : vertexShader(nullptr), fragmentShader(nullptr), geometryShader(nullptr), tessEvalShader(nullptr), tessControlShader(nullptr) {
@@ -79,7 +92,7 @@ ConstantLocation Program::getConstantLocation(const char* name) {
 		location.fragmentSize = constant.size;
 	}
 
-	if (geometryShader->constants.find(d3dname) == geometryShader->constants.end()) {
+	if (geometryShader == nullptr || geometryShader->constants.find(d3dname) == geometryShader->constants.end()) {
 		location.geometryOffset = 0;
 		location.geometrySize = 0;
 	}
@@ -89,7 +102,7 @@ ConstantLocation Program::getConstantLocation(const char* name) {
 		location.geometrySize = constant.size;
 	}
 
-	if (tessControlShader->constants.find(d3dname) == tessControlShader->constants.end()) {
+	if (tessControlShader == nullptr || tessControlShader->constants.find(d3dname) == tessControlShader->constants.end()) {
 		location.tessControlOffset = 0;
 		location.tessControlSize = 0;
 	}
@@ -99,7 +112,7 @@ ConstantLocation Program::getConstantLocation(const char* name) {
 		location.tessControlSize = constant.size;
 	}
 
-	if (tessEvalShader->constants.find(d3dname) == tessEvalShader->constants.end()) {
+	if (tessEvalShader == nullptr || tessEvalShader->constants.find(d3dname) == tessEvalShader->constants.end()) {
 		location.tessEvalOffset = 0;
 		location.tessEvalSize = 0;
 	}
@@ -188,22 +201,45 @@ void Program::link(const VertexStructure& structure) {
 		}
 	}
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
-	state.InputLayout = { vertexDesc, (UINT)structure.size };
-	state.pRootSignature = rootSignature;
-	state.VS = { vertexShader->data, (SIZE_T)vertexShader->length };
-	state.PS = { fragmentShader->data, (SIZE_T)fragmentShader->length };
-	state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	state.DepthStencilState.DepthEnable = FALSE;
-	state.DepthStencilState.StencilEnable = FALSE;
-	state.SampleMask = UINT_MAX;
-	state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	state.NumRenderTargets = 1;
-	state.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	state.SampleDesc.Count = 1;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.VS.BytecodeLength = vertexShader->length;
+	psoDesc.VS.pShaderBytecode = vertexShader->data;
+	psoDesc.PS.BytecodeLength = fragmentShader->length;
+	psoDesc.PS.pShaderBytecode = fragmentShader->data;
+	psoDesc.pRootSignature = rootSignature;
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	
+	psoDesc.InputLayout.NumElements = structure.size;
+	psoDesc.InputLayout.pInputElementDescs = vertexDesc;
 
-	affirm(device->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&pipelineState)));
+	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
+	psoDesc.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+	psoDesc.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+	psoDesc.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+	psoDesc.RasterizerState.DepthClipEnable = TRUE;
+	psoDesc.RasterizerState.MultisampleEnable = FALSE;
+	psoDesc.RasterizerState.AntialiasedLineEnable = FALSE;
+	psoDesc.RasterizerState.ForcedSampleCount = 0;
+	psoDesc.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
-	affirm(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocators[currentFrame], pipelineState, IID_PPV_ARGS(&commandList)));
+	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.BlendState.RenderTarget[0].BlendEnable = true;
+	psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+	psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+	psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.DepthStencilState.DepthEnable = false;
+	psoDesc.DepthStencilState.StencilEnable = false;
+	psoDesc.SampleMask = 0xFFFFFFFF;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+	device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));
 }

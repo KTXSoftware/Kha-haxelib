@@ -4,16 +4,12 @@
 #include <Kore/Math/Matrix.h>
 #include <d3d12.h>
 
-const int frameCount = 3;
+static const int QUEUE_SLOT_COUNT = 3;
+extern int currentBackBuffer;
 extern ID3D12Device* device;
-extern ID3D12GraphicsCommandList* commandList;
 extern ID3D12RootSignature* rootSignature;
-extern ID3D12CommandAllocator* bundleAllocator;
-extern ID3D12CommandAllocator* commandAllocators[frameCount];
-extern unsigned currentFrame;
-//extern ID3D12DeviceContext* context;
-//extern ID3D12RenderTargetView* renderTargetView;
-//extern ID3D12DepthStencilView* depthStencilView;
+extern ID3D12GraphicsCommandList* commandList;
+extern ID3D12Resource* constantBuffers[QUEUE_SLOT_COUNT];
 
 extern Kore::u8 vertexConstants[1024 * 4];
 extern Kore::u8 fragmentConstants[1024 * 4];

@@ -22,6 +22,7 @@ import kha.math.Vector2;
 import kha.math.Vector3;
 import kha.math.Vector4;
 import kha.Rectangle;
+import kha.Video;
 
 @:headerCode('
 #include <Kore/pch.h>
@@ -55,6 +56,13 @@ class Graphics implements kha.graphics4.Graphics {
 		if (z != null) flags |= 2;
 		if (stencil != null) flags |= 4;
 		clear2(flags, color == null ? 0 : color.value, z, stencil);
+	}
+
+	@:functionCode('
+		Kore::Graphics::viewport(x,y,width,height);
+	')
+	public function viewport(x : Int, y : Int, width : Int, height : Int): Void{
+	
 	}
 	
 	@:functionCode('
@@ -267,6 +275,11 @@ class Graphics implements kha.graphics4.Graphics {
 	public function setTexture(unit: kha.graphics4.TextureUnit, texture: kha.Image): Void {
 		if (texture == null) return;
 		texture.set(cast unit);
+	}
+
+	public function setVideoTexture(unit: kha.graphics4.TextureUnit, texture: kha.Video): Void {
+		if (texture == null) return;
+		Image.createFromVideo(texture).set(cast unit);
 	}
 	
 	//public function createVertexShader(source: Blob): VertexShader {

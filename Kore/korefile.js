@@ -10,8 +10,12 @@ function addBackend(name) {
 
 if (platform === Platform.Windows) {
 	addBackend('Windows');
+	project.addLib('dxguid');
+	project.addLib('dsound');
+	project.addLib('dinput8');
 	
-	project.addIncludeDir('Backends/Windows/Libraries/directx/Include');
+	project.addDefine('_WINSOCK_DEPRECATED_NO_WARNINGS');
+	project.addLib('ws2_32');
 
 	if (graphics === GraphicsApi.OpenGL) {
 		addBackend('OpenGL');
@@ -35,24 +39,17 @@ if (platform === Platform.Windows) {
 		project.addDefine('DIRECT3D');
 	}
 
-	project.addLibsFor('Win32', 'Backends/Windows/Libraries/directx/Lib/x86/dxguid', 'Backends/Windows/Libraries/directx/Lib/x86/DxErr', 'Backends/Windows/Libraries/directx/Lib/x86/dsound', 'Backends/Windows/Libraries/directx/Lib/x86/dinput8');
-	project.addLibsFor('x64', 'Backends/Windows/Libraries/directx/Lib/x64/dxguid', 'Backends/Windows/Libraries/directx/Lib/x64/DxErr', 'Backends/Windows/Libraries/directx/Lib/x64/dsound');
 	if (graphics !== GraphicsApi.OpenGL) {
 		if (graphics === GraphicsApi.Direct3D12) {
 			project.addLib('d3d12');
 		}
 		else if (graphics === GraphicsApi.Direct3D11) {
-			project.addLibFor('Win32', 'Backends/Windows/Libraries/directx/Lib/x86/d3d11');
-			project.addLibFor('x64', 'Backends/Windows/Libraries/directx/Lib/x64/d3d11');
+			project.addLib('d3d11');
 		}
 		else {
-			project.addLibFor('Win32', 'Backends/Windows/Libraries/directx/Lib/x86/d3d9');
-			project.addLibFor('x64', 'Backends/Windows/Libraries/directx/Lib/x64/d3d9');
+			project.addLib('d3d9');
 		}
 	}
-
-	project.addDefine('_WINSOCK_DEPRECATED_NO_WARNINGS');
-	project.addLib('ws2_32');
 }
 else if (platform === Platform.WindowsApp) {
 	addBackend('WindowsApp');
@@ -68,15 +65,22 @@ else if (platform === Platform.PlayStation3) {
 }
 else if (platform === Platform.OSX) {
 	addBackend('OSX');
-	addBackend('OpenGL2');
-	project.addDefine('OPENGL');
+	if (graphics === GraphicsApi.Metal) {
+		addBackend('Metal');
+		project.addDefine('SYS_METAL');
+		project.addLib('Metal');
+	}
+	else {
+		addBackend('OpenGL2');
+		project.addDefine('OPENGL');
+		project.addLib('OpenGL');
+	}
 	project.addLib('IOKit');
 	project.addLib('Cocoa');
 	project.addLib('AppKit');
 	project.addLib('CoreAudio');
 	project.addLib('CoreData');
 	project.addLib('Foundation');
-	project.addLib('OpenGL');
 	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.iOS) {
@@ -109,6 +113,7 @@ else if (platform === Platform.Android) {
 	addBackend('OpenGL2');
 	project.addDefine('OPENGL');
 	project.addDefine('SYS_ANDROID_API=15');
+	project.addDefine('HXCPP_ANDROID_PLATFORM=23');
 	project.addDefine('SYS_UNIXOID');
 }
 else if (platform === Platform.HTML5) {
@@ -129,10 +134,6 @@ else if (platform === Platform.Tizen) {
 	project.addExclude('Backends/OpenGL2/Sources/GL/**');
 	project.addDefine('OPENGL');
 	project.addDefine('SYS_UNIXOID');
-}
-
-if (platform !== Platform.Android) {
-	project.addExclude('Sources/Kore/IO/miniz.cpp')
 }
 
 return project;

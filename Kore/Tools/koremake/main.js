@@ -1,50 +1,26 @@
-var child_process = require('child_process');
-var fs = require('fs-extra');
-var os = require('os');
-var path = require('path');
-var log = require('./log.js');
-var Files = require('./Files.js');
-var GraphicsApi = require('./GraphicsApi.js');
-var Options = require('./Options.js');
-var Paths = require('./Paths.js');
-var Project = require('./Project.js');
-var Platform = require('./Platform.js');
-var Solution = require('./Solution.js');
-var exec = require('./exec.js');
-var VisualStudioVersion = require('./VisualStudioVersion.js');
-var ExporterAndroid = require('./ExporterAndroid.js');
-var ExporterCodeBlocks = require('./ExporterCodeBlocks.js');
-var ExporterMakefile = require('./ExporterMakefile.js');
-var ExporterEmscripten = require('./ExporterEmscripten.js');
-var ExporterTizen = require('./ExporterTizen.js');
-var ExporterVisualStudio = require('./ExporterVisualStudio.js');
-var ExporterXCode = require('./ExporterXCode.js');
+"use strict";
 
-if (!String.prototype.startsWith) {
-	Object.defineProperty(String.prototype, 'startsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || 0;
-			return this.indexOf(searchString, position) === position;
-		}
-	});
-}
-
-if (!String.prototype.endsWith) {
-	Object.defineProperty(String.prototype, 'endsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || this.length;
-			position = position - searchString.length;
-			var lastIndex = this.lastIndexOf(searchString);
-			return lastIndex !== -1 && lastIndex === position;
-		}
-	});
-}
+const child_process = require('child_process');
+const fs = require('fs-extra');
+const os = require('os');
+const path = require('path');
+const log = require('./log.js');
+const Files = require('./Files.js');
+const GraphicsApi = require('./GraphicsApi.js');
+const Options = require('./Options.js');
+const Paths = require('./Paths.js');
+const Project = require('./Project.js');
+const Platform = require('./Platform.js');
+const Solution = require('./Solution.js');
+const exec = require('./exec.js');
+const VisualStudioVersion = require('./VisualStudioVersion.js');
+const ExporterAndroid = require('./ExporterAndroid.js');
+const ExporterCodeBlocks = require('./ExporterCodeBlocks.js');
+const ExporterMakefile = require('./ExporterMakefile.js');
+const ExporterEmscripten = require('./ExporterEmscripten.js');
+const ExporterTizen = require('./ExporterTizen.js');
+const ExporterVisualStudio = require('./ExporterVisualStudio.js');
+const ExporterXCode = require('./ExporterXCode.js');
 
 function escapeRegExp(string) {
 	return string.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
@@ -53,12 +29,6 @@ function escapeRegExp(string) {
 String.prototype.replaceAll = function (find, replace) {
 	return this.replace(new RegExp(escapeRegExp(find), 'g'), replace);
 };
-
-if (!String.prototype.contains) {
-	String.prototype.contains = function () {
-		return String.prototype.indexOf.apply(this, arguments) !== -1;
-	};
-}
 
 function fromPlatform(platform) {
 	switch (platform) {
@@ -99,7 +69,7 @@ function shaderLang(platform) {
 				case GraphicsApi.Direct3D11:
 					return "d3d11";
 				case GraphicsApi.Direct3D12:
-					return 'd3d12';
+					return 'd3d11';
 				default:
 					return "d3d9";
 			}
@@ -132,19 +102,20 @@ function shaderLang(platform) {
 }
 
 function compileShader(projectDir, type, from, to, temp, platform, nokrafix) {
-	var compiler = '';
+	let compiler = '';
 	
 	if (Project.koreDir.path !== '') {
-		if(nokrafix) {
+		if (nokrafix) {
 			compiler = Project.koreDir.resolve(Paths.get("Tools", "kfx", "kfx" + exec.sys())).toString();
-		} else {
+		}
+		else {
 			compiler = Project.koreDir.resolve(Paths.get("Tools", "krafix", "krafix" + exec.sys())).toString();
 		}
 	}
 
 	if (fs.existsSync(path.join(projectDir.toString(), 'Backends'))) {
-		var libdirs = fs.readdirSync(path.join(projectDir.toString(), 'Backends'));
-		for (var ld in libdirs) {
+		let libdirs = fs.readdirSync(path.join(projectDir.toString(), 'Backends'));
+		for (let ld in libdirs) {
 			var libdir = path.join(projectDir.toString(), 'Backends', libdirs[ld]);
 			if (fs.statSync(libdir).isDirectory()) {
 				var exe = path.join(libdir, 'krafix', 'krafix-' + platform + '.exe');
@@ -161,29 +132,28 @@ function compileShader(projectDir, type, from, to, temp, platform, nokrafix) {
 }
 
 function exportKoremakeProject(from, to, platform, options) {
-	log.info("korefile found, generating build files.");
-	log.info("Generating " + fromPlatform(platform) + " solution.");
+	log.info('korefile found.');
+	log.info('Creating ' + fromPlatform(platform) + ' project files.');
 
-	var solution = Solution.create(from, platform);
+	let solution = Solution.create(from, platform);
 	solution.searchFiles();
 	solution.flatten();
 
 	if (!Files.exists(to)) Files.createDirectories(to);
 
-	var project = solution.getProjects()[0];
-	var files = project.getFiles();
-	for (var f in files) {
-		var file = files[f];
+	let project = solution.getProjects()[0];
+	let files = project.getFiles();
+	for (let file of files) {
 		if (file.endsWith(".glsl")) {
-			var outfile = file;
-			var index = outfile.lastIndexOf('/');
+			let outfile = file;
+			const index = outfile.lastIndexOf('/');
 			if (index > 0) outfile = outfile.substr(index);
 			outfile = outfile.substr(0, outfile.length - 5);
 			compileShader(from, shaderLang(platform), file, path.join(project.getDebugDir(), outfile), "build", platform, options.nokrafix);
 		}
 	}
 
-	var exporter = null;
+	let exporter = null;
 	if (platform == Platform.iOS || platform == Platform.OSX) exporter = new ExporterXCode();
 	else if (platform == Platform.Android) exporter = new ExporterAndroid();
 	else if (platform == Platform.HTML5) exporter = new ExporterEmscripten(options.emcc);
@@ -193,7 +163,7 @@ function exportKoremakeProject(from, to, platform, options) {
 	}
 	else if (platform == Platform.Tizen) exporter = new ExporterTizen();
 	else {
-		var found = false;
+		let found = false;
 		for (var p in Platform) {
 			if (platform === Platform[p]) {
 				found = true;
@@ -204,9 +174,8 @@ function exportKoremakeProject(from, to, platform, options) {
 			exporter = new ExporterVisualStudio();
 		}
 		else {
-			var libdirs = fs.readdirSync(path.join(from.toString(), 'Backends'));
-			for (var ld in libdirs) {
-				var libdir = libdirs[ld];
+			let libdirs = fs.readdirSync(path.join(from.toString(), 'Backends'));
+			for (let libdir of libdirs) {
 				if (fs.statSync(path.join(from.toString(), 'Backends', libdir)).isDirectory()) {
 					var libfiles = fs.readdirSync(path.join(from.toString(), 'Backends', libdir));
 					for (var lf in libfiles) {
@@ -245,35 +214,35 @@ exports.api = 1;
 exports.run = function (options, loglog, callback) {
 	log.set(loglog);
 	
-	if (options.graphicsApi !== undefined) {
-		Options.graphicsApi = options.graphicsApi;
+	if (options.graphics !== undefined) {
+		Options.graphicsApi = options.graphics;
 	}
 	
-	if (options.visualStudioVersion !== undefined) {
-		Options.visualStudioVersion = options.visualStudioVersion;
+	if (options.visualstudio !== undefined) {
+		Options.visualStudioVersion = options.visualstudio;	
 	}
 	
-	if (options.vrApi !== undefined) {
-		Options.vrApi = options.vrApi;
+	if (options.vr != undefined) {
+		Options.vrApi = options.vr;
 	}
 	
-	var solution = exportProject(Paths.get(options.from), Paths.get(options.to), options.platform, options);
-	var project = solution.getProjects()[0];
-	var solutionName = solution.getName();
+	let solution = exportProject(Paths.get(options.from), Paths.get(options.to), options.target, options);
+	let project = solution.getProjects()[0];
+	let solutionName = solution.getName();
 	
 	if (options.compile && solutionName != "") {
 		log.info('Compiling...');
 
-		var make = null;
+		let make = null;
 
-		if (options.platform === Platform.Linux) {
+		if (options.target === Platform.Linux) {
 			make = child_process.spawn('make', [], { cwd: options.to });
 		}
-		else if (options.platform === Platform.OSX) {
+		else if (options.target === Platform.OSX) {
 			make = child_process.spawn('xcodebuild', ['-project', solutionName + '.xcodeproj'], { cwd: options.to });
 		}
-		else if (options.platform === Platform.Windows) {
-			var vsvars = null;
+		else if (options.target === Platform.Windows) {
+			let vsvars = null;
 			if (process.env.VS140COMNTOOLS) {
 				vsvars = process.env.VS140COMNTOOLS + '\\vsvars32.bat';
 			}
@@ -303,17 +272,17 @@ exports.run = function (options, loglog, callback) {
 
 			make.on('close', function (code) {
 				if (code === 0) {
-					if (options.platform === Platform.Linux) {
+					if (options.target === Platform.Linux) {
 						fs.copySync(path.join(options.to.toString(), solutionName), path.join(options.from.toString(), project.getDebugDir(), solutionName));
 					}
-					else if (options.platform === Platform.Windows) {
+					else if (options.target === Platform.Windows) {
 						fs.copySync(path.join(options.to.toString(), 'Debug', solutionName + '.exe'), path.join(options.from.toString(), project.getDebugDir(), solutionName + '.exe'));
 					}
 					if (options.run) {
-						if (options.platform === Platform.OSX) {
+						if (options.target === Platform.OSX) {
 							child_process.spawn('open', ['build/Release/' + solutionName + '.app/Contents/MacOS/' + solutionName], {cwd: options.to});
 						}
-						else if (options.platform === Platform.Linux || options.platform === Platform.Windows) {
+						else if (options.target === Platform.Linux || options.target === Platform.Windows) {
 							child_process.spawn(path.resolve(path.join(options.from.toString(), project.getDebugDir(), solutionName)), [], {cwd: path.join(options.from.toString(), project.getDebugDir())});
 						}
 						else {
@@ -336,4 +305,3 @@ exports.run = function (options, loglog, callback) {
 	}
 	else callback();
 };
-

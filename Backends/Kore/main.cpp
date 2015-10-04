@@ -79,6 +79,9 @@ namespace {
 		case Kore::Key_Delete:
 			Starter_obj::pushDelete();
 			break;
+		case Kore::Key_Back:
+			Starter_obj::pushBack();
+			break;
 		default:
 			Starter_obj::pushChar(character);
 			break;
@@ -128,6 +131,9 @@ namespace {
 		case Kore::Key_Delete:
 			Starter_obj::releaseDelete();
 			break;
+		case Kore::Key_Back:
+			Starter_obj::releaseBack();
+			break;
 		default:
 			Starter_obj::releaseChar(character);
 			break;
@@ -144,6 +150,10 @@ namespace {
 
 	void mouseMove(int x, int y) {
 		Starter_obj::mouseMove(x, y);
+	}
+
+	void mouseWheel(int delta) {
+		Starter_obj::mouseWheel(delta);
 	}
 
 	void accelerometerChanged(float x, float y, float z) {
@@ -175,8 +185,10 @@ namespace {
 	}
 	
 	bool visible = true;
+	bool paused = false;
 
 	void update() {
+		if (paused) return;
 		Kore::Audio::update();
 		if (visible) {
 			#ifndef VR_RIFT
@@ -212,10 +224,12 @@ namespace {
 	
 	void resume() {
 		Starter_obj::resume();
+		paused = false;
 	}
 
 	void pause() {
 		Starter_obj::pause();
+		paused = true;
 	}
 	
 	void background() {
@@ -301,6 +315,7 @@ int kore(int argc, char** argv) {
 				int gamesize = tokens[i].size * 2;
 				++i;
 				int gamestart = i;
+				char number[25];
 				for (; i < gamestart + gamesize; ++i) {
 					if (tokens[i].type == JSMN_STRING && strncmp("name", &string[tokens[i].start], tokens[i].end - tokens[i].start) == 0) {
 						++i;
@@ -313,7 +328,6 @@ int kore(int argc, char** argv) {
 					}
 					else if (tokens[i].type == JSMN_STRING && strncmp("width", &string[tokens[i].start], tokens[i].end - tokens[i].start) == 0) {
 						++i;
-						char number[25];
 						int ni = 0;
 						for (int i2 = tokens[i].start; i2 < tokens[i].end; ++i2) {
 							number[ni] = string[i2];
@@ -324,7 +338,6 @@ int kore(int argc, char** argv) {
 					}
 					else if (tokens[i].type == JSMN_STRING && strncmp("height", &string[tokens[i].start], tokens[i].end - tokens[i].start) == 0) {
 						++i;
-						char number[25];
 						int ni = 0;
 						for (int i2 = tokens[i].start; i2 < tokens[i].end; ++i2) {
 							number[ni] = string[i2];
@@ -335,7 +348,6 @@ int kore(int argc, char** argv) {
 					}
 					else if (tokens[i].type == JSMN_STRING && strncmp("antiAliasingSamples", &string[tokens[i].start], tokens[i].end - tokens[i].start) == 0) {
 						++i;
-						char number[25];
 						int ni = 0;
 						for (int i2 = tokens[i].start; i2 < tokens[i].end; ++i2) {
 							number[ni] = string[i2];
@@ -378,11 +390,19 @@ int kore(int argc, char** argv) {
 	Kore::log(Kore::Info, "Initializing Haxe libraries");
 	hxcpp_set_top_of_stack();
 
+// TODO: remove Graphics::begin/end/swapBuffers when loading is async
+#ifndef VR_RIFT
+	Kore::Graphics::begin();
+#endif
 	const char* err = hxRunLibrary();
 	if (err) {
 		fprintf(stderr, "Error %s\n", err);
 		return 1;
 	}
+#ifndef VR_RIFT
+	Kore::Graphics::end();
+	Kore::Graphics::swapBuffers();
+#endif
 
 	Kore::Audio::audioCallback = mix;
 	Kore::Audio::init();
@@ -391,6 +411,7 @@ int kore(int argc, char** argv) {
 	Kore::Mouse::the()->Press = mouseDown;
 	Kore::Mouse::the()->Release = mouseUp;
 	Kore::Mouse::the()->Move = mouseMove;
+	Kore::Mouse::the()->Scroll = mouseWheel;
 	Kore::Gamepad::get(0)->Axis = gamepadAxis;
 	Kore::Gamepad::get(0)->Button = gamepadButton;
 	Kore::Surface::the()->TouchStart = touchStart;
@@ -398,7 +419,6 @@ int kore(int argc, char** argv) {
 	Kore::Surface::the()->Move = touchMove;
 	Kore::Sensor::the(Kore::SensorAccelerometer)->Changed = accelerometerChanged;
 	Kore::Sensor::the(Kore::SensorGyroscope)->Changed = gyroscopeChanged;
-
 
 #ifdef VR_GEAR_VR
 	// Enter VR mode

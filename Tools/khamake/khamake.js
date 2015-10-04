@@ -1,34 +1,10 @@
-﻿var version = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
+﻿"use strict";
 
-if (version < 0.12) {
-	console.log('Sorry, this requires at least node version 0.12.');
+var version = Number(process.version.match(/^v(\d+\.\d+)/)[1]);
+
+if (version < 4.0) {
+	console.log('Sorry, this requires at least node version 4.0.');
 	process.exit(1);
-}
-
-if (!String.prototype.startsWith) {
-	Object.defineProperty(String.prototype, 'startsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || 0;
-			return this.indexOf(searchString, position) === position;
-		}
-	});
-}
-
-if (!String.prototype.endsWith) {
-	Object.defineProperty(String.prototype, 'endsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || this.length;
-			position = position - searchString.length;
-			var lastIndex = this.lastIndexOf(searchString);
-			return lastIndex !== -1 && lastIndex === position;
-		}
-	});
 }
 
 function escapeRegExp(string) {
@@ -44,40 +20,14 @@ var os = require('os');
 var path = require('path');
 var exec = require('./exec.js');
 var korepath = require('./korepath.js');
-var Files = require(path.join(korepath.get(), 'Files.js'));
+var Files = require('./Files.js');
 var GraphicsApi = require('./GraphicsApi.js');
 var VrApi = require('./VrApi.js');
 var Options = require('./Options.js');
-var Path = require(path.join(korepath.get(), 'Path.js'));
-var Paths = require(path.join(korepath.get(), 'Paths.js'));
+var Path = require('./Path.js');
+var Paths = require('./Paths.js');
 var Platform = require('./Platform.js');
 var VisualStudioVersion = require('./VisualStudioVersion.js');
-
-if (!String.prototype.startsWith) {
-	Object.defineProperty(String.prototype, 'startsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || 0;
-			return this.indexOf(searchString, position) === position;
-		}
-	});
-}
-
-if (!String.prototype.endsWith) {
-	Object.defineProperty(String.prototype, 'endsWith', {
-		enumerable: false,
-		configurable: false,
-		writable: false,
-		value: function (searchString, position) {
-			position = position || this.length;
-			position = position - searchString.length;
-			var lastIndex = this.lastIndexOf(searchString);
-			return lastIndex !== -1 && lastIndex === position;
-		}
-	});
-}
 
 var defaultTarget;
 if (os.platform() === "linux") {
@@ -132,14 +82,14 @@ var options = [
 	{
 		full: 'graphics',
 		short: 'g',
-		description: 'Graphics api to use',
+		description: 'Graphics api to use. Possible parameters are direct3d9, direct3d11, direct3d12, metal and opengl.',
 		value: true,
 		default: GraphicsApi.Direct3D9
 	},
 	{
 		full: 'visualstudio',
 		short: 'v',
-		description: 'Version of Visual Studio to use',
+		description: 'Version of Visual Studio to use. Possible parameters are vs2010, vs2012, vs2013 and vs2015.',
 		value: true,
 		default: VisualStudioVersion.VS2015
 	},
@@ -299,6 +249,11 @@ function printHelp() {
 	}
 }
 
+function isTarget(target) {
+	if (target.trim().length < 1) return false;
+	return true;
+}
+
 for (var o in options) {
 	var option = options[o];
 	if (option.value) {
@@ -352,7 +307,7 @@ for (var i = 2; i < args.length; ++i) {
 		}
 	}
 	else {
-		parsedOptions.target = arg;
+		if (isTarget(arg)) parsedOptions.target = arg;
 	}
 }
 
@@ -369,7 +324,7 @@ if (parsedOptions.init) {
 	
 	if (!fs.existsSync(path.join(parsedOptions.from, 'project.kha'))) {
 		var project = {
-			format: 2,
+			format: 3,
 			game: {
 				name: parsedOptions.name,
 				width: 640,
@@ -445,6 +400,10 @@ else if (parsedOptions.addasset !== '') {
 		project.assets.push({ file: name, name: name, type: 'sound'});
 		console.log('Added sound ' + name + '. Please make sure ' + filename + ' is in your Assets directory. You can optionally change the type of ' + name + ' to music in your project.kha.');
 	}
+	else if (filename.endsWith('.mp4') || filename.endsWith('.wmv') || filename.endsWith('.avi')) {
+		project.assets.push({ file: name, name: name, type: 'video'});
+		console.log('Added image ' + name + '. Please make sure ' + filename + ' is in your Assets directory.');
+	}
 	else if (filename.endsWith('.ttf')) {
 		console.log('Please use --addfont to add fonts.');
 		process.exit(1);
@@ -458,7 +417,8 @@ else if (parsedOptions.addasset !== '') {
 else if (parsedOptions.addallassets) {
 	var hasAsset = function (project, name) {
 		for (var a in project.assets) {
-			if (project.assets[a].name === name) return true;
+			var asset = project.assets[a];
+			if (asset.name === name) return true;
 		}
 		return false;
 	};
@@ -479,6 +439,9 @@ else if (parsedOptions.addallassets) {
 			}
 			else if (filename.endsWith('.wav')) {
 				if (!hasAsset(project, name)) project.assets.push({ file: name, name: name, type: 'sound'});
+			}
+			else if (filename.endsWith('.mp4') || filename.endsWith('.wmv') || filename.endsWith('.avi')) {
+				if (!hasAsset(project, name)) project.assets.push({ file: name, name: name, type: 'video'});
 			}
 			else if (filename.endsWith('.ttf')) {
 

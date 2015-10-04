@@ -4,8 +4,8 @@
 	"license": "MIT",
 	"tags": ["cross", "game"],
 	"description": "Ultra portable game/media-app framework",
-	"version": "15.8.0",
-	"releasenote": "Updated to revision 1ff8583508341d013aa04a496dd370ef1df01b63.",
+	"version": "15.10.0",
+	"releasenote": "Updated to revision d24ed325c69406b6384f04e52efc8ed322c76237.",
 	"contributors": ["RobDangerous"],
 	"dependencies": { }
 }

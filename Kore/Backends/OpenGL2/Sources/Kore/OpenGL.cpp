@@ -238,9 +238,13 @@ void Graphics::begin() {
 #endif
 #ifdef SYS_ANDROID
 	// if rendered to a texture, strange things happen if the backbuffer is not cleared
-	glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 #endif
+}
+
+void Graphics::viewport(int x, int y, int width, int height) {
+	glViewport(x,y,width,height);
 }
 
 void Graphics::end() {
@@ -257,7 +261,7 @@ void Graphics::end() {
 			std::printf("OpenGL: Invalid operation\n");
 			break;
 		default:
-			std::printf("OpenGL: Unknown error\n");
+			std::printf("OpenGL: Error code %i\n", code);
 			break;
 		}
 		code = glGetError();

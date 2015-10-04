@@ -317,6 +317,10 @@ void Graphics::begin() {
 #endif
 }
 
+void Graphics::viewport(int x, int y, int width, int height) {
+	//TODO
+}
+
 void Graphics::end() {
 	
 }
@@ -445,7 +449,7 @@ namespace {
 		float* floats = reinterpret_cast<float*>(&constants[offset]);
 		for (int y = 0; y < 3; ++y) {
 			for (int x = 0; x < 3; ++x) {
-				floats[x + y * 3] = value.get(y, x);
+				floats[x + y * 4] = value.get(y, x);
 			}
 		}
 	}

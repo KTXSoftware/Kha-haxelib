@@ -1,5 +1,5 @@
 #include "pch.h"
-#include <Kore/System.h>
+/*#include <Kore/System.h>
 #include <Kore/Application.h>
 #include <Kore/Audio/Audio.h>
 #include <Kore/IO/FileReader.h>
@@ -45,7 +45,6 @@ void Kore::System::showWindow() {
 }
 
 namespace {
-	mz_zip_archive apk;
 	char theApkPath[1001];
 	char filesDir[1001];
 	int width;
@@ -94,14 +93,6 @@ int Kore::System::screenHeight() {
     return height;
 }
 
-char* getApkPath() {
-	return theApkPath;
-}
-
-mz_zip_archive* getApk() {
-	return &apk;
-}
-
 const char* Kore::System::savePath() {
 	return filesDir;
 }
@@ -132,14 +123,10 @@ extern "C" {
     JNIEXPORT void JNICALL Java_com_ktxsoftware_kore_KoreLib_gaze(JNIEnv* env, jobject obj, jfloat x, jfloat y, jfloat z, jfloat w);
 };
 
+void initAndroidFileReader(AAssetManager* assets);
+
 JNIEXPORT void JNICALL Java_com_ktxsoftware_kore_KoreLib_init(JNIEnv* env, jobject obj, jint width, jint height, jobject assetManager, jstring apkPath, jstring filesDir) {
-	if (firstinit)
-	{
-		{
-			const char* path = env->GetStringUTFChars(apkPath, nullptr);
-			std::strcpy(theApkPath, path);
-			env->ReleaseStringUTFChars(apkPath, path);
-		}
+	if (firstinit) {
 		{
 			const char* path = env->GetStringUTFChars(filesDir, nullptr);
 			std::strcpy(::filesDir, path);
@@ -147,10 +134,9 @@ JNIEXPORT void JNICALL Java_com_ktxsoftware_kore_KoreLib_init(JNIEnv* env, jobje
 			env->ReleaseStringUTFChars(filesDir, path);
 		}
 
-#if SYS_ANDROID_API >= 15
     	//(*env)->NewGlobalRef(env, foo);
     	assets = AAssetManager_fromJava(env, assetManager);
-#endif
+		initAndroidFileReader(assets);
 
 		firstinit = false;
 	}
@@ -177,11 +163,6 @@ JNIEXPORT void JNICALL Java_com_ktxsoftware_kore_KoreLib_step(JNIEnv* env, jobje
 	if (!initialized) {
 		++debuggingDelayCount;
 		if (debuggingDelayCount > debuggingDelay) {
-			memset(&apk, 0, sizeof(apk));
-			mz_bool status = mz_zip_reader_init_file(&apk, theApkPath, 0);
-			if (!status) {
-				return;
-			}
 			init();
 			Kore::Application::the()->callback();
 		}
@@ -359,285 +340,446 @@ double Kore::System::time() {
     gettimeofday(&now, NULL);
     return (double)now.tv_sec + (double)(now.tv_usec / 1000000.0);
 }
+*/
 
-/*
-#include <errno.h>
+#include <Kore/Android.h>
+#include <Kore/System.h>
+#include <Kore/Application.h>
+#include <Kore/Log.h>
+#include <Kore/Input/Gamepad.h>
+#include <Kore/Input/Keyboard.h>
+#include <Kore/Input/Mouse.h>
+#include <Kore/Input/Sensor.h>
+#include <Kore/Input/Surface.h>
 #include <EGL/egl.h>
-#include <GLES/gl.h>
 #include <android/sensor.h>
-#include <android/log.h>
 #include <android_native_app_glue.h>
+#include <GLContext.h>
+#include <stdlib.h>
 
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "native-activity", __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "native-activity", __VA_ARGS__))
+extern int kore(int argc, char** argv);
 
-extern int ktmain(int argc, char** argv);
+void pauseAudio();
+void resumeAudio();
 
-static android_app* state;
+namespace {
+	android_app* app;
+	ANativeActivity* activity;
+	ASensorManager* sensorManager;
+	const ASensor* accelerometerSensor;
+	const ASensor* gyroSensor;
+	ASensorEventQueue* sensorEventQueue;
+	bool keyboardShown = false;
+	bool shift = false;
+	int screenRotation = 0;
 
-struct saved_state {
-    float angle;
-    int32_t x;
-    int32_t y;
-};
-
-struct engine {
-    struct android_app* app;
-
-    ASensorManager* sensorManager;
-    const ASensor* accelerometerSensor;
-    ASensorEventQueue* sensorEventQueue;
-
-    int animating;
-    EGLDisplay display;
-    EGLSurface surface;
-    EGLContext context;
-    int32_t width;
-    int32_t height;
-    struct saved_state state;
-};
-
-static engine* engine;
-
-void Kt::System::HandleMessages() {
-	//__android_log_write(ANDROID_LOG_ERROR, "kt", "Kt - handlemessages");
-	// Read all pending events.
-	int ident;
-	int events;
-	struct android_poll_source* source;
+	ndk_helper::GLContext* glContext;
 	
-	// If not animating, we will block forever waiting for events.
-	// If animating, we loop until all events are read, then continue
-	// to draw the next frame of animation.
-	engine->animating = 1;
-	while ((ident=ALooper_pollAll(engine->animating ? 0 : -1, NULL, &events, (void**)&source)) >= 0) {
-	
-	  // Process this event.
-	  if (source != NULL) {
-	      source->process(state, source);
-	  }
-	
-	  // If a sensor has data, process it now.
-	  if (ident == LOOPER_ID_USER) {
-	      if (engine->accelerometerSensor != NULL) {
-	          ASensorEvent event;
-	          while (ASensorEventQueue_getEvents(engine->sensorEventQueue,
-	                  &event, 1) > 0) {
-	              LOGI("accelerometer: x=%f y=%f z=%f",
-	                      event.acceleration.x, event.acceleration.y,
-	                      event.acceleration.z);
-	          }
-	      }
-	  }
-	
-	  // Check if we are exiting.
-	  if (state->destroyRequested != 0) {
-	      Kt::Scheduler::stop();
-	      return;
-	  }
+	bool started = false;
+	bool paused = true;
+
+	void initDisplay() {
+		if (glContext->Resume(app->window) != EGL_SUCCESS) {
+			Kore::log(Kore::Warning, "GL context lost.");
+		}
+	}
+
+	void termDisplay() {
+		glContext->Suspend();
+	}
+
+	int32_t input(android_app* app, AInputEvent* event) {
+		if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
+			size_t count = AMotionEvent_getPointerCount(event);
+			for (size_t i = 0; i < count; ++i) {
+				int id = AMotionEvent_getPointerId(event, i);
+				int action = AMotionEvent_getAction(event);
+				float x = AMotionEvent_getX(event, i);
+				float y = AMotionEvent_getY(event, i);
+
+				switch (action & AMOTION_EVENT_ACTION_MASK) {
+					case AMOTION_EVENT_ACTION_DOWN: //DOWN
+						if (id == 0) {
+							Kore::Mouse::the()->_press(0, x, y);
+						}
+						Kore::Surface::the()->_touchStart(id, x, y);
+						break;
+					case AMOTION_EVENT_ACTION_MOVE: //MOVE
+						if (id == 0) {
+							Kore::Mouse::the()->_move(x, y);
+						}
+						Kore::Surface::the()->_move(id, x, y);
+						break;
+					case AMOTION_EVENT_ACTION_UP: //UP
+					case AMOTION_EVENT_ACTION_CANCEL:
+						if (id == 0) {
+							Kore::Mouse::the()->_release(0, x, y);
+						}
+						Kore::Surface::the()->_touchEnd(id, x, y);
+						break;
+				}
+			}
+			return 1;
+		}
+		else if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+			int32_t code = AKeyEvent_getKeyCode(event);
+
+			if (AKeyEvent_getAction(event) == AKEY_EVENT_ACTION_DOWN)
+			switch (code) {
+				case AKEYCODE_SHIFT_LEFT:
+				case AKEYCODE_SHIFT_RIGHT:
+					shift = true;
+					Kore::Keyboard::the()->_keydown(Kore::Key_Shift, 0);
+					return 1;
+				case 0x00000103:
+					Kore::Keyboard::the()->_keydown(Kore::Key_Backspace, 0);
+					return 1;
+				case AKEYCODE_ENTER:
+					Kore::Keyboard::the()->_keydown(Kore::Key_Return, 0);
+					return 1;
+				case AKEYCODE_DPAD_LEFT:
+					Kore::Gamepad::get(0)->_axis(0, -1);
+					return 1;
+				case AKEYCODE_DPAD_RIGHT:
+					Kore::Gamepad::get(0)->_axis(0, 1);
+					return 1;
+				case AKEYCODE_DPAD_UP:
+					Kore::Gamepad::get(0)->_axis(1, -1);
+					return 1;
+				case AKEYCODE_DPAD_DOWN:
+					Kore::Gamepad::get(0)->_axis(1, 1);
+					return 1;
+				case AKEYCODE_DPAD_CENTER:
+				case AKEYCODE_BUTTON_B:
+					Kore::Gamepad::get(0)->_button(0, 1);
+					return 1;
+				case AKEYCODE_BACK:
+					if (AKeyEvent_getMetaState(event) & AMETA_ALT_ON) { // Xperia Play
+						Kore::Gamepad::get(0)->_button(1, 1);
+						return 1;
+					}
+					else {
+						Kore::Keyboard::the()->_keyup(Kore::Key_Back, 1);
+						return 1;
+					}
+				case AKEYCODE_BUTTON_A:
+					Kore::Gamepad::get(0)->_button(1, 1);
+					return 1;
+				case AKEYCODE_BUTTON_X:
+					Kore::Gamepad::get(0)->_button(2, 1);
+					return 1;
+				case AKEYCODE_BUTTON_Y:
+					Kore::Gamepad::get(0)->_button(3, 1);
+					return 1;
+				default:
+					if (code >= AKEYCODE_A && code <= AKEYCODE_Z) {
+						if (shift)
+							Kore::Keyboard::the()->_keydown((Kore::KeyCode) code, code);
+						else
+							Kore::Keyboard::the()->_keydown((Kore::KeyCode) (code + 'a' - 'A'), code + 'a' - 'A');
+						return 1;
+					}
+			}
+			else if (AKeyEvent_getAction(event) == AKEY_EVENT_ACTION_UP) {
+				switch (code) {
+					case AKEYCODE_SHIFT_LEFT:
+					case AKEYCODE_SHIFT_RIGHT:
+						shift = false;
+						Kore::Keyboard::the()->_keyup(Kore::Key_Shift, 0);
+						return 1;
+					case 0x00000103:
+						Kore::Keyboard::the()->_keyup(Kore::Key_Backspace, 0);
+						return 1;
+					case AKEYCODE_ENTER:
+						Kore::Keyboard::the()->_keyup(Kore::Key_Return, 0);
+						return 1;
+					case AKEYCODE_DPAD_LEFT:
+						Kore::Gamepad::get(0)->_axis(0, 0);
+						return 1;
+					case AKEYCODE_DPAD_RIGHT:
+						Kore::Gamepad::get(0)->_axis(0, 0);
+						return 1;
+					case AKEYCODE_DPAD_UP:
+						Kore::Gamepad::get(0)->_axis(1, 0);
+						return 1;
+					case AKEYCODE_DPAD_DOWN:
+						Kore::Gamepad::get(0)->_axis(1, 0);
+						return 1;
+					case AKEYCODE_DPAD_CENTER:
+					case AKEYCODE_BUTTON_B:
+						Kore::Gamepad::get(0)->_button(0, 0);
+						return 1;
+					case AKEYCODE_BACK:
+						if (AKeyEvent_getMetaState(event) & AMETA_ALT_ON) { // Xperia Play
+							Kore::Gamepad::get(0)->_button(1, 0);
+							return 1;
+						}
+						else {
+							Kore::Keyboard::the()->_keyup(Kore::Key_Back, 0);
+							return 1;
+						}
+					case AKEYCODE_BUTTON_A:
+						Kore::Gamepad::get(0)->_button(1, 0);
+						return 1;
+					case AKEYCODE_BUTTON_X:
+						Kore::Gamepad::get(0)->_button(2, 0);
+						return 1;
+					case AKEYCODE_BUTTON_Y:
+						Kore::Gamepad::get(0)->_button(3, 0);
+						return 1;
+					default:
+						if (code >= AKEYCODE_A && code <= AKEYCODE_Z) {
+							if (shift)
+								Kore::Keyboard::the()->_keyup((Kore::KeyCode) code, code);
+							else
+								Kore::Keyboard::the()->_keyup((Kore::KeyCode) (code + 'a' - 'A'), code + 'a' - 'A');
+							return 1;
+						}
+				}
+			}
+		}
+		return 0;
+	}
+
+	void cmd(android_app* app, int32_t cmd) {
+		switch (cmd) {
+			case APP_CMD_SAVE_STATE:
+				break;
+			case APP_CMD_INIT_WINDOW:
+				if (app->window != NULL) {
+					initDisplay();
+					if (!started) {
+						started = true;
+					}
+					Kore::System::swapBuffers();
+				}
+				break;
+			case APP_CMD_TERM_WINDOW:
+				termDisplay();
+				break;
+			case APP_CMD_GAINED_FOCUS:
+				if (accelerometerSensor != NULL) {
+					ASensorEventQueue_enableSensor(sensorEventQueue, accelerometerSensor);
+					ASensorEventQueue_setEventRate(sensorEventQueue, accelerometerSensor, (1000L / 60) * 1000);
+				}
+				if (gyroSensor != NULL) {
+					ASensorEventQueue_enableSensor(sensorEventQueue, gyroSensor);
+					ASensorEventQueue_setEventRate(sensorEventQueue, gyroSensor, (1000L / 60) * 1000);
+				}
+				break;
+			case APP_CMD_LOST_FOCUS:
+				if (accelerometerSensor != NULL) {
+					ASensorEventQueue_disableSensor(sensorEventQueue, accelerometerSensor);
+				}
+				if (gyroSensor != NULL) {
+					ASensorEventQueue_disableSensor(sensorEventQueue, gyroSensor);
+				}
+				break;
+			case APP_CMD_START:
+				if (Kore::Application::the() != nullptr && Kore::Application::the()->foregroundCallback != nullptr) Kore::Application::the()->foregroundCallback();
+				break;
+			case APP_CMD_RESUME:
+				if (Kore::Application::the() != nullptr && Kore::Application::the()->resumeCallback != nullptr) Kore::Application::the()->resumeCallback();
+				resumeAudio();
+				paused = false;
+				break;
+			case APP_CMD_PAUSE:
+				if (Kore::Application::the() != nullptr && Kore::Application::the()->pauseCallback != nullptr) Kore::Application::the()->pauseCallback();
+				pauseAudio();
+				paused = true;
+				break;
+			case APP_CMD_STOP:
+				if (Kore::Application::the() != nullptr && Kore::Application::the()->backgroundCallback != nullptr) Kore::Application::the()->backgroundCallback();
+				break;
+			case APP_CMD_DESTROY:
+				if (Kore::Application::the() != nullptr && Kore::Application::the()->shutdownCallback != nullptr) Kore::Application::the()->shutdownCallback();
+				break;
+			case APP_CMD_CONFIG_CHANGED: {
+
+				break;
+			}
+		}
 	}
 }
 
-static int engine_init_display() {
-    // initialize OpenGL ES and EGL
-
-    //
-    // Here specify the attributes of the desired configuration.
-    // Below, we select an EGLConfig with at least 8 bits per color
-    // component compatible with on-screen windows
-    //
-    const EGLint attribs[] = {
-            EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-            EGL_BLUE_SIZE, 8,
-            EGL_GREEN_SIZE, 8,
-            EGL_RED_SIZE, 8,
-            EGL_DEPTH_SIZE, 16,
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
-            EGL_NONE
-    };
-    EGLint w, h, dummy, format;
-    EGLint numConfigs;
-    EGLConfig config;
-    EGLSurface surface;
-    EGLContext context;
-
-    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-
-	int version1, version2;
-    eglInitialize(display, &version1, &version2);
-    
-    __android_log_print(ANDROID_LOG_ERROR, "kt", "OpenGL ES version %d %d", version1, version2);
-
-    // Here, the application chooses the configuration it desires. In this
-    // sample, we have a very simplified selection process, where we pick
-    // the first EGLConfig that matches our criteria
-    eglChooseConfig(display, attribs, &config, 1, &numConfigs);
-
-    // EGL_NATIVE_VISUAL_ID is an attribute of the EGLConfig that is
-    // guaranteed to be accepted by ANativeWindow_setBuffersGeometry().
-    // As soon as we picked a EGLConfig, we can safely reconfigure the
-    // ANativeWindow buffers to match, using EGL_NATIVE_VISUAL_ID.
-    eglGetConfigAttrib(display, config, EGL_NATIVE_VISUAL_ID, &format);
-
-    ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
-
-    surface = eglCreateWindowSurface(display, config, engine->app->window, NULL);
-    context = eglCreateContext(display, config, NULL, NULL);
-
-    if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {
-        LOGW("Unable to eglMakeCurrent");
-        return -1;
-    }
-
-    eglQuerySurface(display, surface, EGL_WIDTH, &w);
-    eglQuerySurface(display, surface, EGL_HEIGHT, &h);
-
-    engine->display = display;
-    engine->context = context;
-    engine->surface = surface;
-    engine->width = w;
-    engine->height = h;
-    engine->state.angle = 0;
-
-    // Initialize GL state.
-    //glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
-    //glEnable(GL_CULL_FACE);
-    glShadeModel(GL_SMOOTH);
-    //glEnable(GL_DEPTH_TEST);
-
-__android_log_write(ANDROID_LOG_ERROR, "kt", "OpenGL initialized");
-
-    return 0;
+ANativeActivity* KoreAndroid::getActivity() {
+	return activity;
 }
 
-void* Kt::System::CreateWindow() {
-	__android_log_write(ANDROID_LOG_ERROR, "kt", "Kt - createwindow");
-	engine_init_display();
-	Scheduler::addFrameTask(HandleMessages, 1001);
+AAssetManager* KoreAndroid::getAssetManager() {
+	return activity->assetManager;
+}
+
+jclass KoreAndroid::findClass(JNIEnv* env, const char* name) {
+	jobject nativeActivity = activity->clazz;
+	jclass acl = env->GetObjectClass(nativeActivity);
+	jmethodID getClassLoader = env->GetMethodID(acl, "getClassLoader", "()Ljava/lang/ClassLoader;");
+	jobject cls = env->CallObjectMethod(nativeActivity, getClassLoader);
+	jclass classLoader = env->FindClass("java/lang/ClassLoader");
+	jmethodID findClass = env->GetMethodID(classLoader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+	jstring strClassName = env->NewStringUTF(name);
+	jclass clazz = (jclass) (env->CallObjectMethod(cls, findClass, strClassName));
+	env->DeleteLocalRef(strClassName);
+	return clazz;
+}
+
+void* Kore::System::createWindow() {
 	return nullptr;
 }
 
-void Kt::System::SwitchBuffers() {
-	if (engine->display == NULL) return;
-	eglSwapBuffers(engine->display, engine->surface);
+void Kore::System::swapBuffers() {
+	if (glContext->Swap() != EGL_SUCCESS) {
+		Kore::log(Kore::Warning, "GL context lost.");
+	}
 }
 
-void Kt::System::DestroyWindow() {
-	if (engine->display != EGL_NO_DISPLAY) {
-        eglMakeCurrent(engine->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        if (engine->context != EGL_NO_CONTEXT) {
-            eglDestroyContext(engine->display, engine->context);
-        }
-        if (engine->surface != EGL_NO_SURFACE) {
-            eglDestroySurface(engine->display, engine->surface);
-        }
-        eglTerminate(engine->display);
-    }
-    engine->animating = 0;
-    engine->display = EGL_NO_DISPLAY;
-    engine->context = EGL_NO_CONTEXT;
-    engine->surface = EGL_NO_SURFACE;
+void Kore::System::destroyWindow() {
+
 }
 
-static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
-    struct engine* engine = (struct engine*)app->userData;
-    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        engine->animating = 1;
-        engine->state.x = AMotionEvent_getX(event, 0);
-        engine->state.y = AMotionEvent_getY(event, 0);
-        return 1;
-    }
-    return 0;
+void Kore::System::showKeyboard() {
+	keyboardShown = true;
+	ANativeActivity_showSoftInput(activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
 }
 
-static bool windowshown = false;
-
-static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
-    struct engine* engine = (struct engine*)app->userData;
-    switch (cmd) {
-        case APP_CMD_SAVE_STATE:
-            // The system has asked us to save our current state.  Do so.
-            engine->app->savedState = malloc(sizeof(struct saved_state));
-            *((struct saved_state*)engine->app->savedState) = engine->state;
-            engine->app->savedStateSize = sizeof(struct saved_state);
-            break;
-        case APP_CMD_INIT_WINDOW:
-            // The window is being shown, get it ready.
-            if (engine->app->window != NULL) {
-                //engine_init_display();
-            //    engine_draw_frame(engine);
-            	windowshown = true;
-            	__android_log_write(ANDROID_LOG_ERROR, "kt", "Kt - init_window");
-            	ktmain(0, nullptr);
-            }
-            break;
-        case APP_CMD_TERM_WINDOW:
-            // The window is being hidden or closed, clean it up.
-            //engine_term_display();
-            Kt::Scheduler::stop();
-            	__android_log_write(ANDROID_LOG_ERROR, "kt", "Kt - term_window");
-            break;
-        case APP_CMD_GAINED_FOCUS:
-            // When our app gains focus, we start monitoring the accelerometer.
-            if (engine->accelerometerSensor != NULL) {
-                ASensorEventQueue_enableSensor(engine->sensorEventQueue,
-                        engine->accelerometerSensor);
-                // We'd like to get 60 events per second (in us).
-                ASensorEventQueue_setEventRate(engine->sensorEventQueue,
-                        engine->accelerometerSensor, (1000L/60)*1000);
-            }
-            break;
-        case APP_CMD_LOST_FOCUS:
-            // When our app loses focus, we stop monitoring the accelerometer.
-            // This is to avoid consuming battery while not being used.
-            if (engine->accelerometerSensor != NULL) {
-                ASensorEventQueue_disableSensor(engine->sensorEventQueue,
-                        engine->accelerometerSensor);
-            }
-            // Also stop animating.
-            engine->animating = 0;
-        //    engine_draw_frame(engine);
-        Kt::System::SwitchBuffers();
-            break;
-    }
+void Kore::System::hideKeyboard() {
+	if (keyboardShown) {
+		keyboardShown = false;
+		ANativeActivity_hideSoftInput(activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
+	}
 }
 
-namespace {
-	AAssetManager* assets = nullptr;
+void Kore::System::loadURL(const char* url) {
+
 }
 
-AAssetManager* getAssetManager() {
-	return assets;
+int Kore::System::screenWidth() {
+	if (screenRotation == 0 || screenRotation == 2) {
+		return glContext->GetScreenWidth();
+	}
+	else {
+		return glContext->GetScreenHeight();
+	}
 }
 
-extern "C" void android_main(struct android_app* state) {
-	struct engine engine;
-	::engine = &engine;
-	::state = state;
-	assets = state->activity->assetManager;
-		// Make sure glue isn't stripped.
-    app_dummy();
-    
-	__android_log_write(ANDROID_LOG_ERROR, "kt", "Kt - starting");
+int Kore::System::screenHeight() {
+	if (screenRotation == 0 || screenRotation == 2) {
+		return glContext->GetScreenHeight();
+	}
+	else {
+		return glContext->GetScreenWidth();
+	}
+}
 
-    memset(&engine, 0, sizeof(engine));
-    state->userData = &engine;
-    state->onAppCmd = engine_handle_cmd;
-    state->onInputEvent = engine_handle_input;
-    engine.app = state;
+const char* Kore::System::savePath() {
+	return KoreAndroid::getActivity()->internalDataPath;
+}
 
-    // Prepare to monitor accelerometer
-    engine.sensorManager = ASensorManager_getInstance();
-    engine.accelerometerSensor = ASensorManager_getDefaultSensor(engine.sensorManager,
-            ASENSOR_TYPE_ACCELEROMETER);
-    engine.sensorEventQueue = ASensorManager_createEventQueue(engine.sensorManager,
-            state->looper, LOOPER_ID_USER, NULL, NULL);
+const char* Kore::System::systemId() {
+	return "Android";
+}
 
-    if (state->savedState != NULL) {
-        // We are starting with a previous saved state; restore from it.
-        engine.state = *(struct saved_state*)state->savedState;
-    }
-    
-    while (!windowshown) Kt::System::HandleMessages();
-	//ktmain(0, nullptr);
+void Kore::System::changeResolution(int, int, bool) {
+
+}
+
+void Kore::System::setTitle(const char*) {
+
+}
+
+void Kore::System::showWindow() {
+
+}
+
+#include <sys/time.h>
+#include <time.h>
+
+double Kore::System::frequency() {
+	return 1000000.0;
+}
+
+Kore::System::ticks Kore::System::timestamp() {
+	timeval now;
+	gettimeofday(&now, NULL);
+	return static_cast<ticks>(now.tv_sec) * 1000000 + static_cast<ticks>(now.tv_usec);
+}
+
+double Kore::System::time() {
+	timeval now;
+	gettimeofday(&now, NULL);
+	return (double)now.tv_sec + (now.tv_usec / 1000000.0);
+}
+
+bool Kore::System::handleMessages() {
+	int ident;
+	int events;
+	android_poll_source* source;
+
+	while ((ident = ALooper_pollAll(paused ? -1 : 0, NULL, &events, (void**)&source)) >= 0) {
+		if (source != NULL) {
+			source->process(app, source);
+		}
+
+		if (ident == LOOPER_ID_USER) {
+			if (accelerometerSensor != NULL) {
+				ASensorEvent event;
+				while (ASensorEventQueue_getEvents(sensorEventQueue, &event, 1) > 0) {
+					if(event.type == ASENSOR_TYPE_ACCELEROMETER) {
+						Kore::Sensor::_changed(Kore::SensorAccelerometer, event.acceleration.x, event.acceleration.y, event.acceleration.z);
+					}
+					else if (event.type == ASENSOR_TYPE_GYROSCOPE) {
+						Kore::Sensor::_changed(Kore::SensorGyroscope, event.vector.x, event.vector.x, event.vector.z);
+					}
+				}
+			}
+		}
+
+		if (app->destroyRequested != 0) {
+			termDisplay();
+			Kore::Application::the()->stop();
+			return true;
+		}
+	}
+
+	JNIEnv* env;
+	activity->vm->AttachCurrentThread(&env, nullptr);
+	jclass koreActivityClass = KoreAndroid::findClass(env, "com.ktxsoftware.kore.KoreActivity");
+	jmethodID koreActivityGetRotation = env->GetStaticMethodID(koreActivityClass, "getRotation", "()I");
+	screenRotation = env->CallStaticIntMethod(koreActivityClass, koreActivityGetRotation);
+	activity->vm->DetachCurrentThread();
+
+	return true;
+}
+
+void initAndroidFileReader();
+
+/*jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+	JNIEnv* env;
+	vm->GetEnv((void**)&env, JNI_VERSION_1_6);
+	koreActivityClass = env->FindClass("com/ktxsoftware/kore/KoreActivity");
+	koreActivityGetRotation = env->GetStaticMethodID(koreActivityClass, "getRotation", "()I");
+	koreMoviePlayerClass = env->FindClass("com/ktxsoftware/kore/KoreMoviePlayer");
+	return JNI_VERSION_1_6;
 }*/
+
+extern "C" void android_main(android_app* app) {
+	app_dummy();
+
+	::app = app;
+	activity = app->activity;
+	initAndroidFileReader();
+	app->onAppCmd = cmd;
+	app->onInputEvent = input;
+
+	glContext = ndk_helper::GLContext::GetInstance();
+	sensorManager = ASensorManager_getInstance();
+	accelerometerSensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
+	gyroSensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_GYROSCOPE);
+	sensorEventQueue = ASensorManager_createEventQueue(sensorManager, app->looper, LOOPER_ID_USER, NULL, NULL);
+
+	while (!started) {
+		Kore::System::handleMessages();
+	}
+	kore(0, nullptr);
+	exit(0);
+}
