@@ -54,6 +54,12 @@ var options = [
 		default: 'build'
 	},
 	{
+		full: 'projectfile',
+		value: true,
+		description: 'Name of your project file, defaults to "khafile.js"',
+		default: 'khafile.js'
+	},
+	{
 		full: 'target',
 		short: 't',
 		value: true,
@@ -198,37 +204,14 @@ var options = [
 		value: false
 	},
 	{
-		full: 'addfont',
-		description: 'Add a bitmap font to the project',
-		value: false
-	},
-	{
-		full: 'fontname',
-		description: 'Name of a truetype font',
-		value: true,
-		default: 'Arial'
-	},
-	{
-		full: 'fontsize',
-		description: 'Point size of the generated font',
-		value: true,
-		default: '12'
-	},
-	{
 		full: 'port',
 		description: 'Running port for the server',
 		value: true,
 		default: 8080
 	},
 	{
-		full: 'addasset',
-		description: 'Add an asset to project.kha.',
-		value: true,
-		default: ''
-	},
-	{
-		full: 'addallassets',
-		description: 'Searches the Assets directory and adds all unknown files to project.kha.',
+		full: 'debug',
+		description: 'Compile in debug mode for native targets.',
 		value: false
 	}
 ];
@@ -321,141 +304,73 @@ if (parsedOptions.run) {
 
 if (parsedOptions.init) {
 	console.log('Initializing Kha project.\n');
-	
-	if (!fs.existsSync(path.join(parsedOptions.from, 'project.kha'))) {
-		var project = {
-			format: 3,
-			game: {
-				name: parsedOptions.name,
-				width: 640,
-				height: 480
-			},
-			assets: [],
-			rooms: []
-		};
-		fs.writeFileSync(path.join(parsedOptions.from, 'project.kha'), JSON.stringify(project, null, '\t'), { encoding: 'utf8' });
+
+	if (!fs.existsSync(path.join(parsedOptions.from, parsedOptions.projectfile))) {
+		fs.writeFileSync(path.join(parsedOptions.from, parsedOptions.projectfile),
+			  "var project = new Project('Blocks');\n"
+			+ "project.addAssets('Assets/**');\n"
+			+ "project.addSources('Sources');\n"
+			+ "return project;\n",
+		{ encoding: 'utf8' });
 	}
-	
+
 	if (!fs.existsSync(path.join(parsedOptions.from, 'Assets'))) fs.mkdirSync(path.join(parsedOptions.from, 'Assets'));
 	if (!fs.existsSync(path.join(parsedOptions.from, 'Sources'))) fs.mkdirSync(path.join(parsedOptions.from, 'Sources'));
-	
+
 	var friendlyName = parsedOptions.name;
 	friendlyName = friendlyName.replace(/ /g, '_');
 	friendlyName = friendlyName.replace(/-/g, '_');
 
 	if (!fs.existsSync(path.join(parsedOptions.from, 'Sources', 'Main.hx'))) {
-		var mainsource = 'package;\n\nimport kha.Starter;\n\n'
+		var mainsource = 'package;\n\nimport kha.System;\n\n'
 			+ 'class Main {\n'
 			+ '\tpublic static function main() {\n'
-			+ '\t\tvar starter = new Starter();\n'
-			+ '\t\tstarter.start(new ' + friendlyName + '());\n'
+			+ '\t\tSystem.init("' + parsedOptions.name + '", 1024, 768, function () {\n'
+			+ '\t\t\tnew ' + friendlyName + '();\n'
+			+ '\t\t});\n'
 			+ '\t}\n'
 			+ '}\n';
 		fs.writeFileSync(path.join(parsedOptions.from, 'Sources', 'Main.hx'), mainsource, { encoding: 'utf8' });
 	}
-	
+
 	if (!fs.existsSync(path.join(parsedOptions.from, 'Sources', friendlyName + '.hx'))) {
-		var projectsource = 'package;\n\nimport kha.Game;\n\n'
-			+ 'class ' + friendlyName + ' extends Game {\n'
+		var projectsource = 'package;\n\nimport kha.Framebuffer;\nimport kha.Scheduler;\nimport kha.System;\n\n'
+			+ 'class ' + friendlyName + ' {\n'
 			+ '\tpublic function new() {\n'
-			+ '\t\tsuper("' + parsedOptions.name + '");\n'
-			+ '\t}\n\n'
-			+ '\toverride function init(): Void {\n'
+			+ '\t\tSystem.notifyOnRender(render);\n'
+			+ '\t\tScheduler.addTimeTask(update, 0, 1 / 60);\n'
+			+ '\t}\n'
+			+ '\n'
+			+ '\tfunction update(): Void {\n'
+			+ '\t\t\n'
+			+ '\t}\n'
+			+ '\n'
+			+ '\tfunction render(framebuffer: Framebuffer): Void {'
 			+ '\t\t\n'
 			+ '\t}\n'
 			+ '}\n';
 		fs.writeFileSync(path.join(parsedOptions.from, 'Sources', friendlyName + '.hx'), projectsource, { encoding: 'utf8' });
 	}
-	
+
 	console.log('If you want to use the git version of Kha, execute "git init" and "git add submodule https://github.com/ktxsoftware/Kha.git".');
 }
 else if (parsedOptions.server) {
 	console.log('Running server on ' + parsedOptions.port);
 	var nstatic = require('node-static');
 	var fileServer = new nstatic.Server(path.join(parsedOptions.from,'build', 'html5'), { cache: 0 });
-	require('http').createServer(function (request, response) {
+	var server = require('http').createServer(function (request, response) {
 		request.addListener('end', function () {
 			fileServer.serve(request, response);
 		}).resume();
-	}).listen(parsedOptions.port);
-}
-else if (parsedOptions.addfont) {
-	console.log('Adding font ' + parsedOptions.fontname + parsedOptions.fontsize + ', please put ' + parsedOptions.fontname + '.ttf in your Assets directory.');
-	var ProjectFile = require('./ProjectFile.js');
-	var project = ProjectFile(Paths.get(parsedOptions.from));
-	project.assets.push({ file: parsedOptions.fontname + '.ttf', name: parsedOptions.fontname, type: 'font', size: parsedOptions.fontsize});
-	fs.writeFileSync(path.join(parsedOptions.from, 'project.kha'), JSON.stringify(project, null, '\t'), { encoding: 'utf8' });
-}
-else if (parsedOptions.addasset !== '') {
-	var ProjectFile = require('./ProjectFile.js');
-	var project = ProjectFile(Paths.get(parsedOptions.from));
-	var filename = parsedOptions.addasset;
-	var name = filename;
-	if (filename.indexOf('.') >= 0) name = filename.substr(0, filename.lastIndexOf('.'));
-	if (filename.endsWith('.png') || filename.endsWith('.jpg')) {
-		project.assets.push({ file: filename, name: name, type: 'image'});
-		console.log('Added image ' + name + '. Please make sure ' + filename + ' is in your Assets directory.');
-	}
-	else if (filename.endsWith('.wav')) {
-		project.assets.push({ file: name, name: name, type: 'sound'});
-		console.log('Added sound ' + name + '. Please make sure ' + filename + ' is in your Assets directory. You can optionally change the type of ' + name + ' to music in your project.kha.');
-	}
-	else if (filename.endsWith('.mp4') || filename.endsWith('.wmv') || filename.endsWith('.avi')) {
-		project.assets.push({ file: name, name: name, type: 'video'});
-		console.log('Added image ' + name + '. Please make sure ' + filename + ' is in your Assets directory.');
-	}
-	else if (filename.endsWith('.ttf')) {
-		console.log('Please use --addfont to add fonts.');
-		process.exit(1);
-	}
-	else {
-		project.assets.push({ file: name, name: name, type: 'blob'});
-		console.log('Added blob ' + filename + '. Please make sure ' + filename + ' is in your Assets directory.');
-	}
-	fs.writeFileSync(path.join(parsedOptions.from, 'project.kha'), JSON.stringify(project, null, '\t'), { encoding: 'utf8' });
-}
-else if (parsedOptions.addallassets) {
-	var hasAsset = function (project, name) {
-		for (var a in project.assets) {
-			var asset = project.assets[a];
-			if (asset.name === name) return true;
+	});
+	server.on('error', function (e) {
+		if (e.code == 'EADDRINUSE') {
+			console.log('Error: Port ' + parsedOptions.port + ' is already in use.');
+			console.log('Please close the competing program (maybe another instance of khamake?)');
+			console.log('or switch to a different port using the --port argument.');
 		}
-		return false;
-	};
-
-	var readDirectory = function (dir) {
-		var filenames = fs.readdirSync(path.join(parsedOptions.from, 'Assets', dir));
-		for (var f in filenames) {
-			var filename = filenames[f];
-			if (fs.statSync(path.join(parsedOptions.from, 'Assets', dir, filename)).isDirectory()) {
-				readDirectory(path.join(dir, filename));
-				continue;
-			}
-			filename = path.join(dir, filename).replaceAll('\\', '/');
-			var name = filename;
-			if (filename.indexOf('.') >= 0) name = filename.substr(0, filename.lastIndexOf('.'));
-			if (filename.endsWith('.png') || filename.endsWith('.jpg')) {
-				if (!hasAsset(project, name)) project.assets.push({ file: filename, name: name, type: 'image'});
-			}
-			else if (filename.endsWith('.wav')) {
-				if (!hasAsset(project, name)) project.assets.push({ file: name, name: name, type: 'sound'});
-			}
-			else if (filename.endsWith('.mp4') || filename.endsWith('.wmv') || filename.endsWith('.avi')) {
-				if (!hasAsset(project, name)) project.assets.push({ file: name, name: name, type: 'video'});
-			}
-			else if (filename.endsWith('.ttf')) {
-
-			}
-			else {
-				if (!hasAsset(project, filename)) project.assets.push({ file: filename, name: filename, type: 'blob'});
-			}
-		}
-	};
-
-	var ProjectFile = require('./ProjectFile.js');
-	var project = ProjectFile(Paths.get(parsedOptions.from));
-	readDirectory('');
-	fs.writeFileSync(path.join(parsedOptions.from, 'project.kha'), JSON.stringify(project, null, '\t'), { encoding: 'utf8' });
+	});
+	server.listen(parsedOptions.port);
 }
 else {
 	require('./main.js').run(parsedOptions, { info: console.log, error: console.log }, function (name) { });

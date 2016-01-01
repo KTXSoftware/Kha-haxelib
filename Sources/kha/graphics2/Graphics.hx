@@ -4,6 +4,7 @@ import kha.Color;
 import kha.FastFloat;
 import kha.Font;
 import kha.graphics4.BlendingOperation;
+import kha.graphics4.PipelineState;
 import kha.Image;
 import kha.math.FastMatrix3;
 import kha.math.Matrix3;
@@ -34,27 +35,47 @@ class Graphics {
 	public function drawVideo(video: Video, x: Float, y: Float, width: Float, height: Float): Void { }
 	public function fillTriangle(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Void { }
 	
+	public var imageScaleQuality(get, set): ImageScaleQuality;
+	
+	private function get_imageScaleQuality(): ImageScaleQuality {
+		return ImageScaleQuality.Low;
+	}
+	
+	private function set_imageScaleQuality(value: ImageScaleQuality): ImageScaleQuality {
+		return ImageScaleQuality.High;
+	}
+	
 	/**
 	The color value is used for geometric primitives as well as for images. Remember to set it back to white to draw images unaltered.
 	*/
 	public var color(get, set): Color;
 	
+	private function get_color(): Color {
+		return Color.Black;
+	}
+	
+	private function set_color(color: Color): Color {
+		return Color.Black;
+	}
+	
 	public var font(get, set): Font;
 	
-	public function get_color(): Color {
-		return Color.Black;
-	}
-	
-	public function set_color(color: Color): Color {
-		return Color.Black;
-	}
-	
-	public function get_font(): Font {
+	private function get_font(): Font {
 		return null;
 	}
 	
-	public function set_font(font: Font): Font {
+	private function set_font(font: Font): Font {
 		return null;
+	}
+	
+	public var fontSize(get, set): Int;
+	
+	private function get_fontSize(): Int {
+		return myFontSize;
+	}
+	
+	private function set_fontSize(value: Int): Int {
+		return myFontSize = value;
 	}
 	
 	public var transformation(get, set): FastMatrix3; // works on the top of the transformation stack
@@ -125,18 +146,26 @@ class Graphics {
 		return opacities[opacities.length - 1] = opacity;
 	}
 	
-	#if sys_g4
-	private var prog: kha.graphics4.Program;
-	
-	public var program(get, set): kha.graphics4.Program;
-	
-	private function get_program(): kha.graphics4.Program {
-		return prog;
+	public function scissor(x: Int, y: Int, width: Int, height: Int): Void {
+		
 	}
 	
-	private function set_program(program: kha.graphics4.Program): kha.graphics4.Program {
-		setProgram(program);
-		return prog = program;
+	public function disableScissor(): Void {
+		
+	}
+	
+	#if sys_g4
+	private var pipe: PipelineState;
+	
+	public var pipeline(get, set): PipelineState;
+	
+	private function get_pipeline(): PipelineState {
+		return pipe;
+	}
+	
+	private function set_pipeline(pipeline: PipelineState): PipelineState {
+		setPipeline(pipeline);
+		return pipe = pipeline;
 	}
 	#end
 	
@@ -146,14 +175,16 @@ class Graphics {
 	
 	private var transformations: Array<FastMatrix3>;
 	private var opacities: Array<Float>;
+	private var myFontSize: Int;
 	
 	public function new() {
 		transformations = new Array<FastMatrix3>();
 		transformations.push(FastMatrix3.identity());
 		opacities = new Array<Float>();
 		opacities.push(1);
+		myFontSize = 12;
 		#if sys_g4
-		prog = null;
+		pipe = null;
 		#end
 	}
 	
@@ -165,7 +196,7 @@ class Graphics {
 		
 	}
 	
-	private function setProgram(program: kha.graphics4.Program): Void {
+	private function setPipeline(pipeline: PipelineState): Void {
 		
 	}
 }

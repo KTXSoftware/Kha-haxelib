@@ -3,15 +3,15 @@
 const path = require('path');
 const Exporter = require('./Exporter.js');
 const Files = require('./Files.js');
+const Paths = require('./Paths.js');
 const Converter = require('./Converter.js');
 
 class KhaExporter extends Exporter {
-	constructor(khaDirectory) {
+	constructor(khaDirectory, directory) {
 		super();
 		this.width = 640;
 		this.height = 480;
 		this.sources = [];
-		this.addSourceDirectory('Sources');
 		this.addSourceDirectory(path.join(khaDirectory.toString(), 'Sources'));
 	}
 
@@ -64,31 +64,28 @@ class KhaExporter extends Exporter {
 		}
 	}
 
-	copyImage(platform, from, to, asset, callback) {
-		callback();
+	copyImage(platform, from, to, asset) {
+		return [];
 	}
 
-	copyMusic(platform, from, to, encoders, callback) {
-		callback();
+	/*copyMusic(platform, from, to, encoders) {
+		return [];
+	}*/
+
+	copySound(platform, from, to, encoders) {
+		return [];
 	}
 
-	copySound(platform, from, to, encoders, callback) {
-		callback();
+	copyVideo(platform, from, to, encoders) {
+		return [];
 	}
 
-	copyVideo(platform, from, to, encoders, callback) {
-		callback();
+	copyBlob(platform, from, to) {
+		return [];
 	}
 
-	copyBlob(platform, from, to, callback) {
-		callback();
-	}
-
-	copyFont(platform, from, to, asset, encoders, callback) {
-		Files.createDirectories(this.directory.resolve(this.sysdir()).resolve(to).parent());
-		Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to), encoders.kravur, (success) => {
-			callback([to]);
-		}, {size: asset.size});
+	copyFont(platform, from, to) {
+		return this.copyBlob(platform, from, to + '.ttf');
 	}
 }
 

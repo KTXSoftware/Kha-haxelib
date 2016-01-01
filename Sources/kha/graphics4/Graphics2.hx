@@ -5,13 +5,13 @@ import kha.Canvas;
 import kha.Color;
 import kha.FastFloat;
 import kha.Font;
+import kha.graphics2.ImageScaleQuality;
 import kha.Image;
 import kha.graphics4.BlendingOperation;
 import kha.graphics4.ConstantLocation;
 import kha.graphics4.CullMode;
 import kha.graphics4.IndexBuffer;
 import kha.graphics4.MipMapFilter;
-import kha.graphics4.Program;
 import kha.graphics4.TextureAddressing;
 import kha.graphics4.TextureFilter;
 import kha.graphics4.TextureFormat;
@@ -21,15 +21,17 @@ import kha.graphics4.VertexBuffer;
 import kha.graphics4.VertexData;
 import kha.graphics4.VertexStructure;
 import kha.math.FastMatrix3;
+import kha.math.FastMatrix4;
 import kha.math.FastVector2;
 import kha.math.Matrix3;
 import kha.math.Matrix4;
 import kha.math.Vector2;
+import kha.Shaders;
 import kha.simd.Float32x4;
 
 class ImageShaderPainter {
-	private var projectionMatrix: Matrix4;
-	private var shaderProgram: Program;
+	private var projectionMatrix: FastMatrix4;
+	private var shaderPipeline: PipelineState;
 	private var structure: VertexStructure;
 	private var projectionLocation: ConstantLocation;
 	private var textureLocation: TextureUnit;
@@ -42,8 +44,8 @@ class ImageShaderPainter {
 	private var lastTexture: Image;
 	private var bilinear: Bool = false;
 	private var g: Graphics;
-	private var myProgram: Program = null;
-	public var program(get, set): Program;
+	private var myPipeline: PipelineState = null;
+	public var pipeline(get, set): PipelineState;
 	
 	public var sourceBlend: BlendingOperation = BlendingOperation.Undefined;
 	public var destinationBlend: BlendingOperation = BlendingOperation.Undefined;
@@ -53,44 +55,45 @@ class ImageShaderPainter {
 		bufferIndex = 0;
 		initShaders();
 		initBuffers();
-		projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
-		textureLocation = shaderProgram.getTextureUnit("tex");
+		projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
+		textureLocation = shaderPipeline.getTextureUnit("tex");
 	}
 	
-	private function get_program(): Program {
-		return myProgram;
+	private function get_pipeline(): PipelineState {
+		return myPipeline;
 	}
 	
-	private function set_program(prog: Program): Program {
-		if (prog == null) {
-			projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
-			textureLocation = shaderProgram.getTextureUnit("tex");
+	private function set_pipeline(pipe: PipelineState): PipelineState {
+		if (pipe == null) {
+			projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
+			textureLocation = shaderPipeline.getTextureUnit("tex");
 		}
 		else {
-			projectionLocation = prog.getConstantLocation("projectionMatrix");
-			textureLocation = prog.getTextureUnit("tex");
+			projectionLocation = pipe.getConstantLocation("projectionMatrix");
+			textureLocation = pipe.getTextureUnit("tex");
 		}
-		return myProgram = prog;
+		return myPipeline = pipe;
 	}
 	
-	public function setProjection(projectionMatrix: Matrix4): Void {
+	public function setProjection(projectionMatrix: FastMatrix4): Void {
 		this.projectionMatrix = projectionMatrix;
 	}
 	
 	private function initShaders(): Void {
-		var fragmentShader = new FragmentShader(Loader.the.getShader("painter-image.frag"));
-		var vertexShader = new VertexShader(Loader.the.getShader("painter-image.vert"));
-	
-		shaderProgram = new Program();
-		shaderProgram.setFragmentShader(fragmentShader);
-		shaderProgram.setVertexShader(vertexShader);
+		shaderPipeline = new PipelineState();
+		shaderPipeline.fragmentShader = Shaders.painter_image_frag;
+		shaderPipeline.vertexShader = Shaders.painter_image_vert;
 
 		structure = new VertexStructure();
 		structure.add("vertexPosition", VertexData.Float3);
 		structure.add("texPosition", VertexData.Float2);
 		structure.add("vertexColor", VertexData.Float4);
+		shaderPipeline.inputLayout = [structure];
 		
-		shaderProgram.link(structure);
+		shaderPipeline.blendSource = BlendingOperation.BlendOne;
+		shaderPipeline.blendDestination = BlendingOperation.InverseSourceAlpha;
+		
+		shaderPipeline.compile();
 	}
 	
 	function initBuffers(): Void {
@@ -175,16 +178,16 @@ class ImageShaderPainter {
 		rectVertexBuffer.unlock();
 		g.setVertexBuffer(rectVertexBuffer);
 		g.setIndexBuffer(indexBuffer);
-		g.setProgram(program == null ? shaderProgram : program);
+		g.setPipeline(pipeline == null ? shaderPipeline : pipeline);
 		g.setTexture(textureLocation, lastTexture);
 		g.setTextureParameters(textureLocation, TextureAddressing.Clamp, TextureAddressing.Clamp, bilinear ? TextureFilter.LinearFilter : TextureFilter.PointFilter, bilinear ? TextureFilter.LinearFilter : TextureFilter.PointFilter, MipMapFilter.NoMipFilter);
 		g.setMatrix(projectionLocation, projectionMatrix);
-		if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
-			g.setBlendingMode(BlendingOperation.BlendOne, BlendingOperation.InverseSourceAlpha);
-		}
-		else {
-			g.setBlendingMode(sourceBlend, destinationBlend);
-		}
+		//if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
+		//	g.setBlendingMode(BlendingOperation.BlendOne, BlendingOperation.InverseSourceAlpha);
+		//}
+		//else {
+		//	g.setBlendingMode(sourceBlend, destinationBlend);
+		//}
 		
 		g.drawIndexedVertices(0, bufferIndex * 2 * 3);
 
@@ -251,8 +254,8 @@ class ImageShaderPainter {
 }
 
 class ColoredShaderPainter {
-	private var projectionMatrix: Matrix4;
-	private var shaderProgram: Program;
+	private var projectionMatrix: FastMatrix4;
+	private var shaderPipeline: PipelineState;
 	private var structure: VertexStructure;
 	private var projectionLocation: ConstantLocation;
 	
@@ -269,8 +272,8 @@ class ColoredShaderPainter {
 	private var triangleIndexBuffer: IndexBuffer;
 	
 	private var g: Graphics;
-	private var myProgram: Program = null;
-	public var program(get, set): Program;
+	private var myPipeline: PipelineState = null;
+	public var pipeline(get, set): PipelineState;
 	
 	public var sourceBlend: BlendingOperation = BlendingOperation.Undefined;
 	public var destinationBlend: BlendingOperation = BlendingOperation.Undefined;
@@ -281,40 +284,41 @@ class ColoredShaderPainter {
 		triangleBufferIndex = 0;
 		initShaders();
 		initBuffers();
-		projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
+		projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
 	}
 	
-	private function get_program(): Program {
-		return myProgram;
+	private function get_pipeline(): PipelineState {
+		return myPipeline;
 	}
 	
-	private function set_program(prog: Program): Program {
-		if (prog == null) {
-			projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
+	private function set_pipeline(pipe: PipelineState): PipelineState {
+		if (pipe == null) {
+			projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
 		}
 		else {
-			projectionLocation = prog.getConstantLocation("projectionMatrix");
+			projectionLocation = pipe.getConstantLocation("projectionMatrix");
 		}
-		return myProgram = prog;
+		return myPipeline = pipe;
 	}
 	
-	public function setProjection(projectionMatrix: Matrix4): Void {
+	public function setProjection(projectionMatrix: FastMatrix4): Void {
 		this.projectionMatrix = projectionMatrix;
 	}
 	
 	private function initShaders(): Void {
-		var fragmentShader = new FragmentShader(Loader.the.getShader("painter-colored.frag"));
-		var vertexShader = new VertexShader(Loader.the.getShader("painter-colored.vert"));
-	
-		shaderProgram = new Program();
-		shaderProgram.setFragmentShader(fragmentShader);
-		shaderProgram.setVertexShader(vertexShader);
+		shaderPipeline = new PipelineState();
+		shaderPipeline.fragmentShader = Shaders.painter_colored_frag;
+		shaderPipeline.vertexShader = Shaders.painter_colored_vert;
 
 		structure = new VertexStructure();
 		structure.add("vertexPosition", VertexData.Float3);
 		structure.add("vertexColor", VertexData.Float4);
+		shaderPipeline.inputLayout = [structure];
 		
-		shaderProgram.link(structure);
+		shaderPipeline.blendSource = BlendingOperation.SourceAlpha;
+		shaderPipeline.blendDestination = BlendingOperation.InverseSourceAlpha;
+			
+		shaderPipeline.compile();
 	}
 	
 	function initBuffers(): Void {
@@ -431,14 +435,14 @@ class ColoredShaderPainter {
 		rectVertexBuffer.unlock();
 		g.setVertexBuffer(rectVertexBuffer);
 		g.setIndexBuffer(indexBuffer);
-		g.setProgram(program == null ? shaderProgram : program);
+		g.setPipeline(pipeline == null ? shaderPipeline : pipeline);
 		g.setMatrix(projectionLocation, projectionMatrix);
-		if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
-			g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
-		}
-		else {
-			g.setBlendingMode(sourceBlend, destinationBlend);
-		}
+		//if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
+		//	g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
+		//}
+		//else {
+		//	g.setBlendingMode(sourceBlend, destinationBlend);
+		//}
 		
 		g.drawIndexedVertices(0, bufferIndex * 2 * 3);
 
@@ -452,14 +456,14 @@ class ColoredShaderPainter {
 		triangleVertexBuffer.unlock();
 		g.setVertexBuffer(triangleVertexBuffer);
 		g.setIndexBuffer(triangleIndexBuffer);
-		g.setProgram(program == null ? shaderProgram : program);
+		g.setPipeline(pipeline == null ? shaderPipeline : pipeline);
 		g.setMatrix(projectionLocation, projectionMatrix);
-		if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
-			g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
-		}
-		else {
-			g.setBlendingMode(sourceBlend, destinationBlend);
-		}
+		//if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
+		//	g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
+		//}
+		//else {
+		//	g.setBlendingMode(sourceBlend, destinationBlend);
+		//}
 		
 		g.drawIndexedVertices(0, triangleBufferIndex * 3);
 
@@ -505,8 +509,8 @@ class ColoredShaderPainter {
 @:headerClassCode("const wchar_t* wtext;")
 #end
 class TextShaderPainter {
-	private var projectionMatrix: Matrix4;
-	private var shaderProgram: Program;
+	private var projectionMatrix: FastMatrix4;
+	private var shaderPipeline: PipelineState;
 	private var structure: VertexStructure;
 	private var projectionLocation: ConstantLocation;
 	private var textureLocation: TextureUnit;
@@ -518,8 +522,9 @@ class TextShaderPainter {
 	private var font: Kravur;
 	private var lastTexture: Image;
 	private var g: Graphics;
-	private var myProgram: Program = null;
-	public var program(get, set): Program;
+	private var myPipeline: PipelineState = null;
+	public var pipeline(get, set): PipelineState;
+	public var fontSize: Int;
 	
 	public var sourceBlend: BlendingOperation = BlendingOperation.Undefined;
 	public var destinationBlend: BlendingOperation = BlendingOperation.Undefined;
@@ -529,44 +534,45 @@ class TextShaderPainter {
 		bufferIndex = 0;
 		initShaders();
 		initBuffers();
-		projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
-		textureLocation = shaderProgram.getTextureUnit("tex");
+		projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
+		textureLocation = shaderPipeline.getTextureUnit("tex");
 	}
 	
-	private function get_program(): Program {
-		return myProgram;
+	private function get_pipeline(): PipelineState {
+		return myPipeline;
 	}
 	
-	private function set_program(prog: Program): Program {
-		if (prog == null) {
-			projectionLocation = shaderProgram.getConstantLocation("projectionMatrix");
-			textureLocation = shaderProgram.getTextureUnit("tex");
+	private function set_pipeline(pipe: PipelineState): PipelineState {
+		if (pipe == null) {
+			projectionLocation = shaderPipeline.getConstantLocation("projectionMatrix");
+			textureLocation = shaderPipeline.getTextureUnit("tex");
 		}
 		else {
-			projectionLocation = prog.getConstantLocation("projectionMatrix");
-			textureLocation = prog.getTextureUnit("tex");
+			projectionLocation = pipe.getConstantLocation("projectionMatrix");
+			textureLocation = pipe.getTextureUnit("tex");
 		}
-		return myProgram = prog;
+		return myPipeline = pipe;
 	}
 	
-	public function setProjection(projectionMatrix: Matrix4): Void {
+	public function setProjection(projectionMatrix: FastMatrix4): Void {
 		this.projectionMatrix = projectionMatrix;
 	}
 	
 	private function initShaders(): Void {
-		var fragmentShader = new FragmentShader(Loader.the.getShader("painter-text.frag"));
-		var vertexShader = new VertexShader(Loader.the.getShader("painter-text.vert"));
-	
-		shaderProgram = new Program();
-		shaderProgram.setFragmentShader(fragmentShader);
-		shaderProgram.setVertexShader(vertexShader);
+		shaderPipeline = new PipelineState();
+		shaderPipeline.fragmentShader = Shaders.painter_text_frag;
+		shaderPipeline.vertexShader = Shaders.painter_text_vert;
 
 		structure = new VertexStructure();
 		structure.add("vertexPosition", VertexData.Float3);
 		structure.add("texPosition", VertexData.Float2);
 		structure.add("vertexColor", VertexData.Float4);
+		shaderPipeline.inputLayout = [structure];
 		
-		shaderProgram.link(structure);
+		shaderPipeline.blendSource = BlendingOperation.SourceAlpha;
+		shaderPipeline.blendDestination = BlendingOperation.InverseSourceAlpha;
+		
+		shaderPipeline.compile();
 	}
 	
 	function initBuffers(): Void {
@@ -651,15 +657,15 @@ class TextShaderPainter {
 		rectVertexBuffer.unlock();
 		g.setVertexBuffer(rectVertexBuffer);
 		g.setIndexBuffer(indexBuffer);
-		g.setProgram(program == null ? shaderProgram : program);
+		g.setPipeline(pipeline == null ? shaderPipeline : pipeline);
 		g.setTexture(textureLocation, lastTexture);
 		g.setMatrix(projectionLocation, projectionMatrix);
-		if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
-			g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
-		}
-		else {
-			g.setBlendingMode(sourceBlend, destinationBlend);
-		}
+		//if (sourceBlend == BlendingOperation.Undefined || destinationBlend == BlendingOperation.Undefined) {
+		//	g.setBlendingMode(BlendingOperation.SourceAlpha, BlendingOperation.InverseSourceAlpha);
+		//}
+		//else {
+		//	g.setBlendingMode(sourceBlend, destinationBlend);
+		//}
 		
 		g.drawIndexedVertices(0, bufferIndex * 2 * 3);
 
@@ -711,6 +717,7 @@ class TextShaderPainter {
 	}
 	
 	public function drawString(text: String, color: Color, x: Float, y: Float, transformation: FastMatrix3): Void {
+		var font = this.font._get(fontSize);
 		var tex = font.getTexture();
 		if (lastTexture != null && tex != lastTexture) drawBuffer();
 		lastTexture = tex;
@@ -745,11 +752,11 @@ class TextShaderPainter {
 class Graphics2 extends kha.graphics2.Graphics {
 	private var myColor: Color;
 	private var myFont: Font;
-	private var projectionMatrix: Matrix4;
+	private var projectionMatrix: FastMatrix4;
 	public var imagePainter: ImageShaderPainter;
 	private var coloredPainter: ColoredShaderPainter;
 	private var textPainter: TextShaderPainter;
-	private var videoProgram: Program;
+	private var videoPipeline: PipelineState;
 	private var canvas: Canvas;
 	private var g: Graphics;
 
@@ -761,21 +768,20 @@ class Graphics2 extends kha.graphics2.Graphics {
 		imagePainter = new ImageShaderPainter(g);
 		coloredPainter = new ColoredShaderPainter(g);
 		textPainter = new TextShaderPainter(g);
+		textPainter.fontSize = fontSize;
 		setProjection();
 		
-		var fragmentShader = new FragmentShader(Loader.the.getShader("painter-video.frag"));
-		var vertexShader = new VertexShader(Loader.the.getShader("painter-video.vert"));
-	
-		videoProgram = new Program();
-		videoProgram.setFragmentShader(fragmentShader);
-		videoProgram.setVertexShader(vertexShader);
+		videoPipeline = new PipelineState();
+		videoPipeline.fragmentShader = Shaders.painter_video_frag;
+		videoPipeline.vertexShader = Shaders.painter_video_vert;
 
 		var structure = new VertexStructure();
 		structure.add("vertexPosition", VertexData.Float3);
 		structure.add("texPosition", VertexData.Float2);
 		structure.add("vertexColor", VertexData.Float4);
+		videoPipeline.inputLayout = [structure];
 		
-		videoProgram.link(structure);
+		videoPipeline.compile();
 	}
 	
 	private static function upperPowerOfTwo(v: Int): Int {
@@ -793,16 +799,16 @@ class Graphics2 extends kha.graphics2.Graphics {
 		var width = canvas.width;
 		var height = canvas.height;
 		if (Std.is(canvas, Framebuffer)) {
-			projectionMatrix = Matrix4.orthogonalProjection(0, width, height, 0, 0.1, 1000);
+			projectionMatrix = FastMatrix4.orthogonalProjection(0, width, height, 0, 0.1, 1000);
 		} else {
 			if (!Image.nonPow2Supported) {
 				width = upperPowerOfTwo(width);
 				height = upperPowerOfTwo(height);
 			}
 			if (g.renderTargetsInvertedY()) {
-				projectionMatrix = Matrix4.orthogonalProjection(0, width, 0, height, 0.1, 1000);
+				projectionMatrix = FastMatrix4.orthogonalProjection(0, width, 0, height, 0.1, 1000);
 			} else {
-				projectionMatrix = Matrix4.orthogonalProjection(0, width, height, 0, 0.1, 1000);
+				projectionMatrix = FastMatrix4.orthogonalProjection(0, width, height, 0, 0.1, 1000);
 			}
 		}
 		imagePainter.setProjection(projectionMatrix);
@@ -923,6 +929,10 @@ class Graphics2 extends kha.graphics2.Graphics {
 		textPainter.setFont(font);
 		return myFont = font;
 	}
+	
+	override public function set_fontSize(value: Int): Int {
+		return super.fontSize = textPainter.fontSize = value;
+	}
 
 	public override function drawLine(x1: Float, y1: Float, x2: Float, y2: Float, strength: Float = 1.0): Void {
 		imagePainter.end();
@@ -956,16 +966,23 @@ class Graphics2 extends kha.graphics2.Graphics {
 		coloredPainter.fillTriangle(color, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
 	}
 	
-	public function setBilinearFiltering(bilinear: Bool): Void {
-		imagePainter.setBilinearFilter(bilinear);
+	private var myImageScaleQuality: ImageScaleQuality = ImageScaleQuality.High;
+	
+	override private function get_imageScaleQuality(): ImageScaleQuality {
+		return myImageScaleQuality;
 	}
 	
-	override private function setProgram(program: Program): Void {
+	override private function set_imageScaleQuality(value: ImageScaleQuality): ImageScaleQuality {
+		imagePainter.setBilinearFilter(value == ImageScaleQuality.High);
+		return myImageScaleQuality = value;
+	}
+	
+	override private function setPipeline(pipeline: PipelineState): Void {
 		flush();
-		imagePainter.program = program;
-		coloredPainter.program = program;
-		textPainter.program = program;
-		if (program != null) g.setProgram(program);
+		imagePainter.pipeline = pipeline;
+		coloredPainter.pipeline = pipeline;
+		textPainter.pipeline = pipeline;
+		if (pipeline != null) g.setPipeline(pipeline);
 	}
 	
 	override public function setBlendingMode(source: BlendingOperation, destination: BlendingOperation): Void {
@@ -978,11 +995,21 @@ class Graphics2 extends kha.graphics2.Graphics {
 		textPainter.destinationBlend = destination;
 	}
 	
-	public override function begin(clear: Bool = true, clearColor: Color = null): Void {
+	override public function scissor(x: Int, y: Int, width: Int, height: Int): Void {
+		flush();
+		g.scissor(x, y, width, height);
+	}
+	
+	
+	override public function disableScissor(): Void {
+		flush();
+		g.disableScissor();
+	}
+	
+	override public function begin(clear: Bool = true, clearColor: Color = null): Void {
 		g.begin();
 		if (clear) this.clear(clearColor);
 		setProjection();
-		g.setCullMode(CullMode.None);
 	}
 	
 	override public function clear(color: Color = null): Void {
@@ -1005,8 +1032,8 @@ class Graphics2 extends kha.graphics2.Graphics {
 	}
 	
 	override public function drawVideo(video: kha.Video, x: Float, y: Float, width: Float, height: Float): Void {
-		setProgram(videoProgram);
+		setPipeline(videoPipeline);
 		drawVideoInternal(video, x, y, width, height);
-		setProgram(null);
+		setPipeline(null);
 	}
 }

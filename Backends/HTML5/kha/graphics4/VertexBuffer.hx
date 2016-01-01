@@ -13,25 +13,29 @@ class VertexBuffer {
 	private var sizes: Array<Int>;
 	private var offsets: Array<Int>;
 	private var usage: Usage;
+	private var instanceDataStepRate: Int;
 	
-	public function new(vertexCount: Int, structure: VertexStructure, usage: Usage, canRead: Bool = false) {
+	public function new(vertexCount: Int, structure: VertexStructure, usage: Usage, instanceDataStepRate: Int = 0, canRead: Bool = false) {
 		this.usage = usage;
+		this.instanceDataStepRate = instanceDataStepRate;
 		mySize = vertexCount;
 		myStride = 0;
 		for (element in structure.elements) {
 			switch (element.data) {
-			case VertexData.Float1:
+			case Float1:
 				myStride += 4 * 1;
-			case VertexData.Float2:
+			case Float2:
 				myStride += 4 * 2;
-			case VertexData.Float3:
+			case Float3:
 				myStride += 4 * 3;
-			case VertexData.Float4:
+			case Float4:
 				myStride += 4 * 4;
+			case Float4x4:
+				myStride += 4 * 4 * 4;
 			}
 		}
 	
-		buffer = Sys.gl.createBuffer();
+		buffer = SystemImpl.gl.createBuffer();
 		data = new Float32Array(Std.int(vertexCount * myStride / 4));
 		
 		sizes = new Array<Int>();
@@ -44,26 +48,30 @@ class VertexBuffer {
 		for (element in structure.elements) {
 			var size;
 			switch (element.data) {
-			case VertexData.Float1:
+			case Float1:
 				size = 1;
-			case VertexData.Float2:
+			case Float2:
 				size = 2;
-			case VertexData.Float3:
+			case Float3:
 				size = 3;
-			case VertexData.Float4:
+			case Float4:
 				size = 4;
+			case Float4x4:
+				size = 4 * 4;
 			}
 			sizes[index] = size;
 			offsets[index] = offset;
 			switch (element.data) {
-			case VertexData.Float1:
+			case Float1:
 				offset += 4 * 1;
-			case VertexData.Float2:
+			case Float2:
 				offset += 4 * 2;
-			case VertexData.Float3:
+			case Float3:
 				offset += 4 * 3;
-			case VertexData.Float4:
+			case Float4:
 				offset += 4 * 4;
+			case Float4x4:
+				offset += 4 * 4 * 4;
 			}
 			++index;
 		}
@@ -74,8 +82,8 @@ class VertexBuffer {
 	}
 	
 	public function unlock(): Void {
-		Sys.gl.bindBuffer(Sys.gl.ARRAY_BUFFER, buffer);
-		Sys.gl.bufferData(Sys.gl.ARRAY_BUFFER, data, usage == Usage.DynamicUsage ? Sys.gl.DYNAMIC_DRAW : Sys.gl.STATIC_DRAW);
+		SystemImpl.gl.bindBuffer(SystemImpl.gl.ARRAY_BUFFER, buffer);
+		SystemImpl.gl.bufferData(SystemImpl.gl.ARRAY_BUFFER, data, usage == Usage.DynamicUsage ? SystemImpl.gl.DYNAMIC_DRAW : SystemImpl.gl.STATIC_DRAW);
 	}
 	
 	public function stride(): Int {
@@ -86,17 +94,34 @@ class VertexBuffer {
 		return mySize;
 	}
 	
-	public function set(): Void {
-		Sys.gl.bindBuffer(Sys.gl.ARRAY_BUFFER, buffer);
+	public function set(offset: Int): Int {
+		var ext: Dynamic = SystemImpl.gl.getExtension("ANGLE_instanced_arrays");
+		SystemImpl.gl.bindBuffer(SystemImpl.gl.ARRAY_BUFFER, buffer);
+		var attributesOffset = 0;
 		for (i in 0...sizes.length) {
-			Sys.gl.enableVertexAttribArray(i);
-			Sys.gl.vertexAttribPointer(i, sizes[i], Sys.gl.FLOAT, false, myStride, offsets[i]);
-			
-			// Not having the following lines prevents instanced rendering in cases where there is no additional attribute with a non-zero divisor
-			var ext : Dynamic = Sys.gl.getExtension("ANGLE_instanced_arrays");
-			if (ext) {
-				ext.vertexAttribDivisorANGLE(i, 0);
+			if (sizes[i] > 4) {
+				var size = sizes[i];
+				var addonOffset = 0;
+				while (size > 0) {
+					SystemImpl.gl.enableVertexAttribArray(offset + attributesOffset);
+					SystemImpl.gl.vertexAttribPointer(offset + attributesOffset, 4, SystemImpl.gl.FLOAT, false, myStride, offsets[i] + addonOffset);
+					if (ext) {
+						ext.vertexAttribDivisorANGLE(offset + attributesOffset, instanceDataStepRate);
+					}
+					size -= 4;
+					addonOffset += 4 * 4;
+					++attributesOffset;
+				}
+			}
+			else {
+				SystemImpl.gl.enableVertexAttribArray(offset + attributesOffset);
+				SystemImpl.gl.vertexAttribPointer(offset + attributesOffset, sizes[i], SystemImpl.gl.FLOAT, false, myStride, offsets[i]);
+				if (ext) {
+					ext.vertexAttribDivisorANGLE(offset + attributesOffset, instanceDataStepRate);
+				}
+				++attributesOffset;
 			}
 		}
+		return attributesOffset;
 	}
 }

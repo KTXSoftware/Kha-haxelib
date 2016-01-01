@@ -12,10 +12,15 @@ import kha.Blob;
 class FragmentShader {
 	public function new(source: Blob) {
 		initFragmentShader(source);
+		cpp.vm.Gc.setFinalizer(this, cpp.Function.fromStaticFunction(destroy));
+	}
+	
+	@:void private static function destroy(shader: FragmentShader): Void {
+		untyped __cpp__('delete shader->shader;');
 	}
 	
 	@:functionCode("
-		shader = new Kore::Shader(source->toBytes()->b->Pointer(), source->length(), Kore::FragmentShader);
+		shader = new Kore::Shader(source->bytes->b->Pointer(), source->get_length(), Kore::FragmentShader);
 	")
 	private function initFragmentShader(source: Blob): Void {
 		

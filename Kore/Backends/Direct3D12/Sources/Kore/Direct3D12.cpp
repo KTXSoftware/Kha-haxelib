@@ -321,6 +321,14 @@ void Graphics::drawIndexedVertices(int start, int count) {
 	commandList->DrawIndexedInstanced(count, 1, 0, 0, 0);
 }
 
+void Graphics::drawIndexedVerticesInstanced(int instanceCount) {
+
+}
+
+void Graphics::drawIndexedVerticesInstanced(int instanceCount, int start, int count) {
+
+}
+
 void Graphics::setTextureAddressing(TextureUnit unit, TexDir dir, TextureAddressing addressing) {
 	
 }
@@ -621,4 +629,16 @@ void Graphics::setRenderTarget(RenderTarget* target, int) {
 	commandList->OMSetRenderTargets(1, &target->renderTargetDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), true, nullptr);
 	commandList->RSSetViewports(1, (D3D12_VIEWPORT*)&target->viewport);
 	commandList->RSSetScissorRects(1, (D3D12_RECT*)&target->scissor);
+}
+
+void Graphics::setVertexBuffers(VertexBuffer** buffers, int count) {
+	buffers[0]->_set(0);
+}
+
+void Graphics::setIndexBuffer(IndexBuffer& buffer) {
+	buffer._set();
+}
+
+void Graphics::setTexture(TextureUnit unit, Texture* texture) {
+	texture->_set(unit);
 }

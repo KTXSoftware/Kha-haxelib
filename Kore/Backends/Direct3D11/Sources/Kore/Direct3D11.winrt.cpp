@@ -263,6 +263,14 @@ void Graphics::drawIndexedVertices(int start, int count) {
 	context->DrawIndexed(count, start, 0);
 }
 
+void Graphics::drawIndexedVerticesInstanced(int instanceCount) {
+
+}
+
+void Graphics::drawIndexedVerticesInstanced(int instanceCount, int start, int count) {
+
+}
+
 namespace {
 	D3D11_TEXTURE_ADDRESS_MODE convertAddressing(TextureAddressing addressing) {
 		switch (addressing) {
@@ -607,4 +615,16 @@ void Graphics::setRenderTarget(RenderTarget* target, int) {
 	context->OMSetRenderTargets(1, &target->renderTargetView, nullptr);
 	CD3D11_VIEWPORT viewPort(0.0f, 0.0f, static_cast<float>(target->width), static_cast<float>(target->height));
 	context->RSSetViewports(1, &viewPort);
+}
+
+void Graphics::setVertexBuffers(VertexBuffer** buffers, int count) {
+	buffers[0]->_set(0);
+}
+
+void Graphics::setIndexBuffer(IndexBuffer& buffer) {
+	buffer._set();
+}
+
+void Graphics::setTexture(TextureUnit unit, Texture* texture) {
+	texture->_set(unit);
 }

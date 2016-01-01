@@ -1,5 +1,7 @@
 #include "pch.h"
 #include <Kore/Graphics/Shader.h>
+#include <Kore/Graphics/Graphics.h>
+#include <Kore/Log.h>
 #include "ogl.h"
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +22,11 @@ ProgramImpl::ProgramImpl() : textureCount(0), vertexShader(nullptr), fragmentSha
 
 Program::Program() {
 	programId = glCreateProgram();
+	glCheckErrors();
+}
+
+ProgramImpl::~ProgramImpl() {
+	glDeleteProgram(programId);
 }
 
 void Program::setVertexShader(Shader* shader) {
@@ -67,13 +74,10 @@ namespace {
 		}
 	}
 
-	void compileShader(uint& id, u8* source, int length, ShaderType type) {
-		char* shaderSource = new char[length + 1];
-		for (int i = 0; i < length; ++i) shaderSource[i] = reinterpret_cast<char*>(source)[i];
-		shaderSource[length] = 0;
-		const char* cShaderSource = shaderSource;
+	void compileShader(uint& id, char* source, int length, ShaderType type) {
 		id = glCreateShader(toGlShader(type));
-		glShaderSource(id, 1, &cShaderSource, 0);
+		glCheckErrors();
+		glShaderSource(id, 1, (const GLchar**)&source, 0);
 		glCompileShader(id);
 
 		int result;
@@ -89,7 +93,7 @@ namespace {
 	}
 }
 
-void Program::link(const VertexStructure& structure) {
+void Program::link(VertexStructure** structures, int count) {
 	compileShader(vertexShader->id, vertexShader->source, vertexShader->length, VertexShader);
 	compileShader(fragmentShader->id, fragmentShader->source, fragmentShader->length, FragmentShader);
 #ifndef OPENGLES
@@ -104,12 +108,21 @@ void Program::link(const VertexStructure& structure) {
 	if (tesselationControlShader != nullptr) glAttachShader(programId, tesselationControlShader->id);
 	if (tesselationEvaluationShader != nullptr) glAttachShader(programId, tesselationEvaluationShader->id);
 #endif
+	glCheckErrors();
 
 	int index = 0;
-	for (int i = 0; i < structure.size; ++i) {
-		VertexElement element = structure.elements[i];
-		glBindAttribLocation(programId, index, element.name);
-		++index;
+	for (int i1 = 0; i1 < count; ++i1) {
+		for (int i2 = 0; i2 < structures[i1]->size; ++i2) {
+			VertexElement element = structures[i1]->elements[i2];
+			glBindAttribLocation(programId, index, element.name);
+			glCheckErrors();
+			if (element.data == Float4x4VertexData) {
+				index += 4;
+			}
+			else {
+				++index;
+			}
+		}
 	}
 
 	glLinkProgram(programId);
@@ -129,6 +142,7 @@ void Program::link(const VertexStructure& structure) {
 #ifndef SYS_LINUX
 	if (tesselationControlShader != nullptr) {
 		glPatchParameteri(GL_PATCH_VERTICES, 3);
+		glCheckErrors();
 	}
 #endif
 #endif
@@ -139,14 +153,19 @@ void Program::set() {
 	programUsesTesselation = tesselationControlShader != nullptr;
 #endif
 	glUseProgram(programId);
-	for (int index = 0; index < textureCount; ++index) glUniform1i(textureValues[index], index);
+	glCheckErrors();
+	for (int index = 0; index < textureCount; ++index) {
+		glUniform1i(textureValues[index], index);
+		glCheckErrors();
+	}
 }
 
 ConstantLocation Program::getConstantLocation(const char* name) {
 	ConstantLocation location;
 	location.location = glGetUniformLocation(programId, name);
+	glCheckErrors();
 	if (location.location < 0) {
-		printf("Uniform %s not found.\n", name);
+		log(Warning, "Uniform %s not found.", name);
 	}
 	return location;
 }
@@ -162,6 +181,7 @@ TextureUnit Program::getTextureUnit(const char* name) {
 	int index = findTexture(name);
 	if (index < 0) {
 		int location = glGetUniformLocation(programId, name);
+		glCheckErrors();
 		index = textureCount;
 		textureValues[index] = location;
 		textures[index] = name;

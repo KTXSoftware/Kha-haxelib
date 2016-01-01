@@ -4,6 +4,7 @@
 #include <Kore/Application.h>
 #include <Kore/System.h>
 #include <Kore/Math/Core.h>
+#include <Kore/Log.h>
 #include "ogl.h"
 #include <cstdio>
 
@@ -39,6 +40,7 @@ namespace {
 	TextureFilter minFilters[32];
 	MipmapFilter mipFilters[32];
 	int originalFramebuffer;
+	uint arrayId;
 }
 
 void Graphics::destroy() {
@@ -112,7 +114,7 @@ void Graphics::init() {
 		wglMakeCurrent(deviceContext, glContext);
 	}
 	else {
-		glContext = tempGlContext; // If we didn't have support for OpenGL 3.x and up, use the OpenGL 2.1 context  
+		glContext = tempGlContext;
 	}
 
 	ShowWindow(windowHandle, SW_SHOW);
@@ -145,6 +147,14 @@ void Graphics::init() {
 #ifdef SYS_WINDOWS
 	if (wglSwapIntervalEXT != nullptr) wglSwapIntervalEXT(1);
 #endif
+
+#if defined(SYS_IOS)
+	glGenVertexArraysOES(1, &arrayId);
+	glCheckErrors();
+#elif !defined(SYS_ANDROID) && !defined(SYS_HTML5) && !defined(SYS_TIZEN)
+	glGenVertexArrays(1, &arrayId);
+	glCheckErrors();
+#endif
 }
 
 unsigned Graphics::refreshRate() {
@@ -165,38 +175,47 @@ void* Graphics::getControl() {
 
 void Graphics::setBool(ConstantLocation location, bool value) {
 	glUniform1i(location.location, value ? 1 : 0);
+	glCheckErrors();
 }
 
 void Graphics::setInt(ConstantLocation location, int value) {
 	glUniform1i(location.location, value);
+	glCheckErrors();
 }
 
 void Graphics::setFloat(ConstantLocation location, float value) {
 	glUniform1f(location.location, value);
+	glCheckErrors();
 }
 
 void Graphics::setFloat2(ConstantLocation location, float value1, float value2) {
 	glUniform2f(location.location, value1, value2);
+	glCheckErrors();
 }
 
 void Graphics::setFloat3(ConstantLocation location, float value1, float value2, float value3) {
 	glUniform3f(location.location, value1, value2, value3);
+	glCheckErrors();
 }
 
 void Graphics::setFloat4(ConstantLocation location, float value1, float value2, float value3, float value4) {
 	glUniform4f(location.location, value1, value2, value3, value4);
+	glCheckErrors();
 }
 
 void Graphics::setFloats(ConstantLocation location, float* values, int count) {
 	glUniform1fv(location.location, count, values);
+	glCheckErrors();
 }
 
 void Graphics::setMatrix(ConstantLocation location, const mat4& value) {
 	glUniformMatrix4fv(location.location, 1, GL_FALSE, &value.matrix[0][0]);
+	glCheckErrors();
 }
 
 void Graphics::setMatrix(ConstantLocation location, const mat3& value) {
 	glUniformMatrix3fv(location.location, 1, GL_FALSE, &value.matrix[0][0]);
+	glCheckErrors();
 }
 
 void Graphics::drawIndexedVertices() {
@@ -206,17 +225,37 @@ void Graphics::drawIndexedVertices() {
 void Graphics::drawIndexedVertices(int start, int count) {
 #ifdef OPENGLES
 #ifdef SYS_ANDROID
-	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, 0);
+	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, (void*)(start * sizeof(GL_UNSIGNED_SHORT)));
 #else
-	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GL_UNSIGNED_INT)));
 #endif
 #else
 	if (programUsesTesselation) {
-		glDrawElements(GL_PATCHES, count, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_PATCHES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GL_UNSIGNED_INT)));
+		glCheckErrors();
 	}
 	else {
-		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GL_UNSIGNED_INT)));
+		glCheckErrors();
 	}	
+#endif
+}
+
+void Graphics::drawIndexedVerticesInstanced(int instanceCount) {
+	drawIndexedVerticesInstanced(instanceCount, 0, IndexBufferImpl::current->count());
+}
+
+void Graphics::drawIndexedVerticesInstanced(int instanceCount, int start, int count) {
+#ifndef OPENGLES
+	int indices[3] = { 0, 1, 2 };
+	if (programUsesTesselation) {
+		glDrawElementsInstanced(GL_PATCHES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GL_UNSIGNED_INT)), instanceCount);
+		glCheckErrors();
+	}
+	else {
+		glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GL_UNSIGNED_INT)), instanceCount);
+		glCheckErrors();
+	}
 #endif
 }
 
@@ -247,25 +286,31 @@ void Graphics::viewport(int x, int y, int width, int height) {
 	glViewport(x,y,width,height);
 }
 
-void Graphics::end() {
-	//glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
-	//glClear(GL_COLOR_BUFFER_BIT);
+void glCheckErrors() {
+#ifdef _DEBUG
 	GLenum code = glGetError();
 	while (code != GL_NO_ERROR) {
-		//std::printf("GLError: %s\n", gluErrorString(code));
+		//std::printf("GLError: %s\n", glewGetErrorString(code));
 		switch (code) {
 		case 1281:
-			std::printf("OpenGL: Invalid value\n");
+			log(Warning, "OpenGL: Invalid value");
 			break;
 		case 1282:
-			std::printf("OpenGL: Invalid operation\n");
+			log(Warning, "OpenGL: Invalid operation");
 			break;
 		default:
-			std::printf("OpenGL: Error code %i\n", code);
+			log(Warning, "OpenGL: Error code %i", code);
 			break;
 		}
 		code = glGetError();
 	}
+#endif
+}
+
+void Graphics::end() {
+	//glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
+	//glClear(GL_COLOR_BUFFER_BIT);
+	glCheckErrors();
 }
 
 void Graphics::clear(uint flags, uint color, float depth, int stencil) {
@@ -345,13 +390,16 @@ void Graphics::setRenderState(RenderState state, int v) {
 		case Clockwise:
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_FRONT);
+			glCheckErrors();
 			break;
 		case CounterClockwise:
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_BACK);
+			glCheckErrors();
 			break;
 		case NoCulling:
 			glDisable(GL_CULL_FACE);
+			glCheckErrors();
 			break;
 		default:
 			break;
@@ -388,6 +436,29 @@ void Graphics::setRenderState(RenderState state, int v) {
 		default:
 			throw Exception();
 	}*/
+}
+
+void Graphics::setVertexBuffers(VertexBuffer** vertexBuffers, int count) {
+#if defined(SYS_IOS)
+	glBindVertexArrayOES(arrayId);
+	glCheckErrors();
+#elif !defined(SYS_ANDROID) && !defined(SYS_HTML5) && !defined(SYS_TIZEN)
+	glBindVertexArray(arrayId);
+	glCheckErrors();
+#endif
+
+	int offset = 0;
+	for (int i = 0; i < count; ++i) {
+		offset += vertexBuffers[i]->_set(offset);
+	}
+}
+
+void Graphics::setIndexBuffer(IndexBuffer& indexBuffer) {
+	indexBuffer._set();
+}
+
+void Graphics::setTexture(TextureUnit unit, Texture* texture) {
+	texture->_set(unit);
 }
 
 void Graphics::setTextureAddressing(TextureUnit unit, TexDir dir, TextureAddressing addressing) {

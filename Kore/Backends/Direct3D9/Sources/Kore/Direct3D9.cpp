@@ -322,6 +322,16 @@ void Graphics::drawIndexedVertices(int start, int count) {
 	device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, VertexBuffer::_current->count(), start, count / 3);
 }
 
+void Graphics::drawIndexedVerticesInstanced(int instanceCount) {
+	affirm(device->SetStreamSourceFreq(VertexBuffer::_current->_offset, (D3DSTREAMSOURCE_INDEXEDDATA | instanceCount)));
+	device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, VertexBuffer::_current->count(), 0, IndexBuffer::_current->count() / 3 * instanceCount);
+}
+
+void Graphics::drawIndexedVerticesInstanced(int instanceCount, int start, int count) {
+	affirm(device->SetStreamSourceFreq(VertexBuffer::_current->_offset, (D3DSTREAMSOURCE_INDEXEDDATA | instanceCount)));
+	device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, VertexBuffer::_current->count(), start, count / 3 * instanceCount);
+}
+
 void Graphics::setTextureAddressing(TextureUnit unit, TexDir dir, TextureAddressing addressing) {
 	DWORD value = 0;
 	switch (addressing) {
@@ -566,17 +576,13 @@ void Graphics::setFloat4(ConstantLocation position, float value1, float value2, 
 
 void Graphics::setFloats(ConstantLocation location, float* values, int count) {
 	if (location.shaderType == -1) return;
-	int dx9count = (count + 3) / 4;
-	if (dx9count == count / 4) {
-		if (location.shaderType == 0) device->SetVertexShaderConstantF(location.reg.regindex, values, dx9count);
-		else device->SetPixelShaderConstantF(location.reg.regindex, values, dx9count);
-	}
-	else {
-		auto data = new float[dx9count * 4];
-		memcpy(data, values, sizeof(float)*count);
-		if (location.shaderType == 0) device->SetVertexShaderConstantF(location.reg.regindex, data, dx9count);
-		else device->SetPixelShaderConstantF(location.reg.regindex, data, dx9count);
-		delete[] data;
+	if (location.shaderType == 0) device->SetVertexShaderConstantF(location.reg.regindex, values, count / 4);
+	else device->SetPixelShaderConstantF(location.reg.regindex, values, count / 4);
+
+	int registerCount = (count + 3) / 4;
+	if (registerCount > count / 4) {
+		if (location.shaderType == 0) device->SetVertexShaderConstantF(location.reg.regindex + count / 4, &values[count / 4 * 4], 1);
+		else device->SetPixelShaderConstantF(location.reg.regindex + count / 4, &values[count / 4 * 4], 1);
 	}
 }
 
@@ -610,4 +616,18 @@ bool Graphics::renderTargetsInvertedY() {
 
 bool Graphics::nonPow2TexturesSupported() {
 	return true;
+}
+
+void Graphics::setVertexBuffers(VertexBuffer** buffers, int count) {
+	for (int i = 0; i < count; ++i) {
+		buffers[i]->_set(i);
+	}
+}
+
+void Graphics::setIndexBuffer(IndexBuffer& buffer) {
+	buffer._set();
+}
+
+void Graphics::setTexture(TextureUnit unit, Texture* texture) {
+	texture->_set(unit);
 }

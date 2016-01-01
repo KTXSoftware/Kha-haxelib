@@ -3,16 +3,11 @@ package kha.input;
 import kha.Key;
 import kha.network.Controller;
 
-@:allow(kha.Starter)
+@:allow(kha.SystemImpl)
 @:expose
-class Keyboard
-//#if sys_server || sys_html5
-implements Controller
-//#end
-{
+class Keyboard extends Controller {
 	public static function get(num: Int = 0): Keyboard {
-		if (num != 0) return null;
-		return instance;
+		return SystemImpl.getKeyboard(num);
 	}
 	
 	public function notify(downListener: Key->String->Void, upListener: Key->String->Void): Void {
@@ -25,11 +20,20 @@ implements Controller
 		if (upListener != null) upListeners.remove(upListener);
 	}
 	
+	public function show(): Void {
+
+	}
+
+	public function hide(): Void {
+
+	}
+
 	private static var instance: Keyboard;
 	private var downListeners: Array<Key->String->Void>;
 	private var upListeners: Array<Key->String->Void>;
 	
 	private function new() {
+		super();
 		downListeners = new Array<Key->String->Void>();
 		upListeners = new Array<Key->String->Void>();
 		instance = this;

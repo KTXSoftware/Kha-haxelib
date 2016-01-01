@@ -2,8 +2,8 @@
 #include <Kore/System.h>
 #include <cstring>
 #include <Kore/Application.h>
+#include <Kore/Audio/Audio.h>
 #include <Kore/Input/Keyboard.h>
-#include <Kore/Input/KeyEvent.h>
 #include <Kore/Input/Mouse.h>
 #include <Kore/ogl.h>
 #include <stdlib.h>
@@ -21,6 +21,7 @@ namespace {
 
 	void drawfunc() {
 		Kore::Application::the()->callback();
+		Kore::Audio::update();
 		//glutSwapBuffers();
 		glfwSwapBuffers();
 	}
@@ -45,33 +46,33 @@ namespace {
 	void onKeyPressed(int key, int action) {
 		if (action == GLFW_PRESS) {
 			switch (key) {
-			case GLFW_KEY_RIGHT:
-				Kore::Keyboard::the()->keydown(Kore::KeyEvent(Kore::Key_Right));
+			case 262:
+				Kore::Keyboard::the()->_keydown(Kore::Key_Right, ' ');
 				break;
-			case GLFW_KEY_LEFT:
-				Kore::Keyboard::the()->keydown(Kore::KeyEvent(Kore::Key_Left));
+			case 263:
+				Kore::Keyboard::the()->_keydown(Kore::Key_Left, ' ');
 				break;
-			case GLFW_KEY_UP:
-				Kore::Keyboard::the()->keydown(Kore::KeyEvent(Kore::Key_Up));
+			case 265:
+				Kore::Keyboard::the()->_keydown(Kore::Key_Up, ' ');
 				break;
-			case GLFW_KEY_DOWN:
-				Kore::Keyboard::the()->keydown(Kore::KeyEvent(Kore::Key_Down));
+			case 264:
+				Kore::Keyboard::the()->_keydown(Kore::Key_Down, ' ');
 				break;
 			}
 		}
 		else {
 			switch (key) {
-			case GLFW_KEY_RIGHT:
-				Kore::Keyboard::the()->keyup(Kore::KeyEvent(Kore::Key_Right));
+			case 262:
+				Kore::Keyboard::the()->_keyup(Kore::Key_Right, ' ');
 				break;
-			case GLFW_KEY_LEFT:
-				Kore::Keyboard::the()->keyup(Kore::KeyEvent(Kore::Key_Left));
+			case 263:
+				Kore::Keyboard::the()->_keyup(Kore::Key_Left, ' ');
 				break;
-			case GLFW_KEY_UP:
-				Kore::Keyboard::the()->keyup(Kore::KeyEvent(Kore::Key_Up));
+			case 265:
+				Kore::Keyboard::the()->_keyup(Kore::Key_Up, ' ');
 				break;
-			case GLFW_KEY_DOWN:
-				Kore::Keyboard::the()->keyup(Kore::KeyEvent(Kore::Key_Down));
+			case 264:
+				Kore::Keyboard::the()->_keyup(Kore::Key_Down, ' ');
 				break;
 			}
 		}
@@ -82,19 +83,19 @@ namespace {
 
 	void onMouseClick(int button, int action) {
 		if (action == GLFW_PRESS) {
-			if (button == 0) Kore::Mouse::the()->_pressLeft(Kore::MouseEvent(mouseX, mouseY));
-			else if (button == 1) Kore::Mouse::the()->_pressRight(Kore::MouseEvent(mouseX, mouseY));
+			if (button == 0) Kore::Mouse::the()->_press(0, mouseX, mouseY);
+			else if (button == 1) Kore::Mouse::the()->_press(1, mouseX, mouseY);
 		}
 		else {
-			if (button == 0) Kore::Mouse::the()->_releaseLeft(Kore::MouseEvent(mouseX, mouseY));
-			else if (button == 1) Kore::Mouse::the()->_releaseRight(Kore::MouseEvent(mouseX, mouseY));
+			if (button == 0) Kore::Mouse::the()->_release(0, mouseX, mouseY);
+			else if (button == 1) Kore::Mouse::the()->_release(1, mouseX, mouseY);
 		}
 	}
 
 	void onMouseMove(int x, int y) {
 		mouseX = x;
 		mouseY = y;
-		Kore::Mouse::the()->_move(Kore::MouseEvent(x, y));
+		Kore::Mouse::the()->_move(x, y);
 	}
 }
 
@@ -154,6 +155,22 @@ double Kore::System::frequency() {
 	return 1000.0;
 }
 
+int Kore::System::screenWidth() {
+    return 800;
+}
+
+int Kore::System::screenHeight() {
+    return 600;
+}
+
+int Kore::System::desktopWidth() {
+    return 800;
+}
+
+int Kore::System::desktopHeight() {
+    return 600;
+}
+
 Kore::System::ticks Kore::System::timestamp() {
 	return static_cast<Kore::System::ticks>(glfwGetTime() * 1000.0);
 }
@@ -169,7 +186,7 @@ int main(int argc, char** argv) {
 	::argc = argc;
 	::argv = argv;
 	kore(argc, argv);
-	System::createWindow();
+	//System::createWindow();
 	//glutMainLoop();
 	emscripten_set_main_loop(drawfunc, 0, 1);
 }

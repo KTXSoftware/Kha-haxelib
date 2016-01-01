@@ -1,6 +1,6 @@
 "use strict";
 
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const KhaExporter = require('./KhaExporter.js');
 const Converter = require('./Converter.js');
@@ -14,7 +14,7 @@ const HaxeProject = require('./HaxeProject.js');
 
 class CSharpExporter extends KhaExporter {
 	constructor(khaDirectory, directory) {
-		super(khaDirectory);
+		super(khaDirectory, directory);
 		this.directory = directory;
 	}
 
@@ -46,6 +46,7 @@ class CSharpExporter extends KhaExporter {
 			to: path.join(this.sysdir() + '-build', 'Sources'),
 			sources: this.sources,
 			defines: defines,
+			parameters: this.parameters,
 			haxeDirectory: haxeDirectory.toString(),
 			system: this.sysdir(),
 			language: 'cs',
@@ -92,27 +93,26 @@ class CSharpExporter extends KhaExporter {
 		this.closeFile();
 	}
 
-	copyMusic(platform, from, to, encoders, callback) {
-		callback([to]);
+	/*copyMusic(platform, from, to, encoders) {
+		return [to];
+	}*/
+
+	copySound(platform, from, to, encoders) {
+		return [to];
 	}
 
-	copySound(platform, from, to, encoders, callback) {
-		callback([to]);
+	copyImage(platform, from, to, asset) {
+		let format = exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, undefined, false);
+		return [to + '.' + format];
 	}
 
-	copyImage(platform, from, to, asset, callback) {
-		exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, undefined, false, (format) => {
-			callback([to + '.' + format]);
-		});
+	copyBlob(platform, from, to) {
+		fs.copySync(from.toString(), this.directory.resolve(this.sysdir()).resolve(to).toString(), { clobber: true });
+		return [to];
 	}
 
-	copyBlob(platform, from, to, callback) {
-		this.copyFile(from, this.directory.resolve(this.sysdir()).resolve(to));
-		callback([to]);
-	}
-
-	copyVideo(platform, from, to, encoders, callback) {
-		callback([to]);
+	copyVideo(platform, from, to, encoders) {
+		return [to];
 	}
 }
 

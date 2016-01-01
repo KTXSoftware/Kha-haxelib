@@ -8,11 +8,11 @@ using namespace Kore;
 
 VertexBuffer* VertexBufferImpl::_current = nullptr;
 
-VertexBufferImpl::VertexBufferImpl(int count) : myCount(count) {
+VertexBufferImpl::VertexBufferImpl(int count, int instanceDataStepRate) : myCount(count), instanceDataStepRate(instanceDataStepRate) {
 
 }
 
-VertexBuffer::VertexBuffer(int count, const VertexStructure& structure) : VertexBufferImpl(count) {
+VertexBuffer::VertexBuffer(int count, const VertexStructure& structure, int instanceDataStepRate) : VertexBufferImpl(count, instanceDataStepRate) {
 	DWORD usage = D3DUSAGE_WRITEONLY;
 #ifdef SYS_WINDOWS
 	usage = D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY;
@@ -34,6 +34,9 @@ VertexBuffer::VertexBuffer(int count, const VertexStructure& structure) : Vertex
 			break;
 		case ColorVertexData:
 			myStride += 4;
+			break;
+		case Float4x4VertexData:
+			myStride += 4 * 4 * 4;
 			break;
 		}
 	}
@@ -64,9 +67,17 @@ void VertexBuffer::unlock() {
 	affirm(vb->Unlock());
 }
 
-void VertexBuffer::set() {
-	_current = this;
-	affirm(device->SetStreamSource(0, vb, 0, stride()));
+int VertexBuffer::_set(int offset) {
+	_offset = offset;
+	if (instanceDataStepRate == 0) {
+		_current = this;
+		affirm(device->SetStreamSourceFreq(offset, (D3DSTREAMSOURCE_INDEXEDDATA)));
+	}
+	else {
+		affirm(device->SetStreamSourceFreq(offset, (D3DSTREAMSOURCE_INSTANCEDATA | instanceDataStepRate)));
+	}
+	affirm(device->SetStreamSource(offset, vb, 0, stride()));
+	return 0;
 }
 
 void VertexBufferImpl::unset() {

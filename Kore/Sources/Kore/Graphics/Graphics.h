@@ -11,14 +11,14 @@
 namespace Kore {
 	class VertexBuffer : public VertexBufferImpl {
 	public:
-		VertexBuffer(int count, const VertexStructure& structure);
+		VertexBuffer(int count, const VertexStructure& structure, int instanceDataStepRate = 0);
 		virtual ~VertexBuffer();
 		float* lock();
 		float* lock(int start, int count);
 		void unlock();
 		int count();
 		int stride();
-		void set();
+		int _set(int offset = 0); // Do not call this directly, use Graphics::setVertexBuffers
 	};
 
 	class IndexBuffer : public IndexBufferImpl {
@@ -28,7 +28,7 @@ namespace Kore {
 		int* lock();
 		void unlock();
 		int count();
-		void set();
+		void _set();
 	};
 
 	enum TextureAddressing {
@@ -130,9 +130,16 @@ namespace Kore {
 		void setFloats(ConstantLocation location, float* values, int count);
 		void setMatrix(ConstantLocation location, const mat3& value);
 		void setMatrix(ConstantLocation location, const mat4& value);
+
+		void setVertexBuffer(VertexBuffer& vertexBuffer);
+		void setVertexBuffers(VertexBuffer** vertexBuffers, int count);
+		void setIndexBuffer(IndexBuffer& indexBuffer);
+		void setTexture(TextureUnit unit, Texture* texture);
 	
 		void drawIndexedVertices();
 		void drawIndexedVertices(int start, int count);
+		void drawIndexedVerticesInstanced(int instanceCount);
+		void drawIndexedVerticesInstanced(int instanceCount, int start, int count);
 
 		void changeResolution(int width, int height);
 		bool hasWindow();

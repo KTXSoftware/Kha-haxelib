@@ -77,8 +77,16 @@ class EmptyGraphics4 implements Graphics {
 	public function setScissor(rect: Rectangle): Void {
 		
 	}
+
+	public function disableScissor(): Void {
+		
+	}
 	
 	public function setVertexBuffer(vertexBuffer: VertexBuffer): Void {
+		
+	}
+	
+	public function setVertexBuffers(vertexBuffers: Array<kha.graphics4.VertexBuffer>): Void {
 		
 	}
 

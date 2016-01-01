@@ -1,5 +1,6 @@
 "use strict";
 
+const fs = require('fs-extra');
 const path = require('path');
 const KhaExporter = require('./KhaExporter.js');
 const Converter = require('./Converter.js');
@@ -12,7 +13,7 @@ const HaxeProject = require('./HaxeProject.js');
 
 class KoreExporter extends KhaExporter {
 	constructor(platform, khaDirectory, vr, directory) {
-		super(khaDirectory);
+		super(khaDirectory, directory);
 		this.platform = platform;
 		this.directory = directory;
 		this.addSourceDirectory(path.join(khaDirectory.toString(), 'Backends/Kore'));
@@ -45,6 +46,7 @@ class KoreExporter extends KhaExporter {
 			to: path.join(this.sysdir() + '-build', 'Sources'),
 			sources: this.sources,
 			defines: defines,
+			parameters: this.parameters,
 			haxeDirectory: haxeDirectory.toString(),
 			system: this.sysdir(),
 			language: 'cpp',
@@ -59,23 +61,22 @@ class KoreExporter extends KhaExporter {
 		Haxe.executeHaxe(this.directory, haxeDirectory, ["project-" + this.sysdir() + ".hxml"], callback);
 	}
 
-	copyMusic(platform, from, to, encoders, callback) {
+	/*copyMusic(platform, from, to, encoders, callback) {
 		Files.createDirectories(this.directory.resolve(this.sysdir()).resolve(to).parent());
 		Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.ogg'), encoders.oggEncoder, (success) => {
 			callback([to + '.ogg']);
 		});
+	}*/
+
+	copySound(platform, from, to, encoders) {
+		fs.copySync(from.toString(), this.directory.resolve(this.sysdir()).resolve(to + '.wav').toString(), { clobber: true });
+		return [to + '.wav'];
 	}
 
-	copySound(platform, from, to, encoders, callback) {
-		this.copyFile(from, this.directory.resolve(this.sysdir()).resolve(to + '.wav'));
-		callback([to + '.wav']);
-	}
-
-	copyImage(platform, from, to, asset, callback) {
+	copyImage(platform, from, to, asset) {
 		if (platform === Platform.iOS && asset.compressed) {
-			exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, 'pvr', true, (format) => {
-				callback([to + '.' + format]);
-			});
+			let format = exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, 'pvr', true);
+			return [to + '.' + format];
 		}
 		/*else if (platform === Platform.Android && asset.compressed) {
 		 var index = to.toString().lastIndexOf('.');
@@ -84,33 +85,29 @@ class KoreExporter extends KhaExporter {
 		 exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, 'astc', true, callback);
 		 }*/
 		else {
-			exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, undefined, true, (format) => {
-				callback([to + '.' + format]);
-			});
+			let format = exportImage(from, this.directory.resolve(this.sysdir()).resolve(to), asset, undefined, true);
+			return [to + '.' + format];
 		}
 	}
 
-	copyBlob(platform, from, to, callback) {
-		this.copyFile(from, this.directory.resolve(this.sysdir()).resolve(to));
-		callback([to]);
+	copyBlob(platform, from, to) {
+		fs.copySync(from.toString(), this.directory.resolve(this.sysdir()).resolve(to).toString(), { clobber: true });
+		return [to];
 	}
 
-	copyVideo(platform, from, to, encoders, callback) {
+	copyVideo(platform, from, to, encoders) {
 		Files.createDirectories(this.directory.resolve(this.sysdir()).resolve(to).parent());
 		if (platform === Platform.iOS) {
-			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.mp4'), encoders.h264Encoder, (success) => {
-				callback([to + '.mp4']);
-			});
+			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.mp4'), encoders.h264Encoder);
+			return [to + '.mp4'];
 		}
 		else if (platform === Platform.Android) {
-			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.ts'), encoders.h264Encoder, (success) => {
-				callback([to + '.ts']);
-			});
+			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.ts'), encoders.h264Encoder);
+			return [to + '.ts'];
 		}
 		else {
-			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.ogv'), encoders.theoraEncoder, (success) => {
-				callback([to + '.ogv']);
-			});
+			Converter.convert(from, this.directory.resolve(this.sysdir()).resolve(to + '.ogv'), encoders.theoraEncoder);
+			return [to + '.ogv'];
 		}
 	}
 }

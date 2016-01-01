@@ -4,6 +4,8 @@ import haxe.macro.Context;
 import haxe.macro.Expr.Field;
 
 class ControllerBuilder {
+	public static var nextId: Int = 0;
+	
 	macro static public function build(): Array<Field> {
 		var fields = Context.getBuildFields();
 		
@@ -24,7 +26,7 @@ class ControllerBuilder {
 				
 				switch (field.kind) {
 				case FFun(f):
-					var size = 17;
+					var size = 26;
 					for (arg in f.args) {
 						switch (arg.type) {
 						case TPath(p):
@@ -49,9 +51,12 @@ class ControllerBuilder {
 						bytes.set(0, kha.network.Session.CONTROLLER_UPDATES);
 						bytes.setInt32(1, _id());
 						bytes.setDouble(5, Scheduler.realTime());
-						bytes.setInt32(13, $v { funcindex } );
+						bytes.setInt32(13, System.pixelWidth);
+						bytes.setInt32(17, System.pixelHeight);
+						bytes.set(21, System.screenRotation.getIndex());
+						bytes.setInt32(22, $v { funcindex } );
 					};
-					var index: Int = 17;
+					var index: Int = 26;
 					for (arg in f.args) {
 						switch (arg.type) {
 						case TPath(p):
@@ -226,7 +231,7 @@ class ControllerBuilder {
 			name: "_receive",
 			doc: null,
 			meta: [],
-			access: [APublic],
+			access: [APublic, AOverride],
 			kind: FFun({
 				ret: null,
 				params: null,
@@ -251,7 +256,7 @@ class ControllerBuilder {
 			name: "_receive",
 			doc: null,
 			meta: [],
-			access: [APublic],
+			access: [APublic, AOverride],
 			kind: FFun({
 				ret: null,
 				params: null,
@@ -271,29 +276,6 @@ class ControllerBuilder {
 		});
 		
 		#end
-		
-		fields.push({
-			name: "_id",
-			doc: null,
-			meta: [],
-			access: [APublic],
-			kind: FFun({
-				ret: Context.toComplexType(Context.getType("Int")),
-				params: null,
-				expr: macro { return __id; },
-				args: []
-			}),
-			pos: Context.currentPos()
-		});
-		
-		fields.push({
-			name: "__id",
-			doc: null,
-			meta: [],
-			access: [APrivate],
-			kind: FVar(macro: Int, macro 0),
-			pos: Context.currentPos()
-		});
 		
 		return fields;
 	}

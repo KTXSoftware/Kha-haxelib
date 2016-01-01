@@ -210,53 +210,51 @@ class Matrix4 {
 	}
 
     @:extern public inline function cofactor(m0: Float, m1: Float, m2: Float,
-                                             m3: Float, m4: Float, m5: Float,
-                                             m6: Float, m7: Float, m8: Float): Float
-    {
-        return m0 * ( m4 * m8 - m5 * m7 ) - m1 * ( m3 * m8 - m5 * m6 ) + m2 * ( m3 * m7 - m4 * m6 );
-    }
+											m3: Float, m4: Float, m5: Float,
+											m6: Float, m7: Float, m8: Float): Float {
+		return m0 * ( m4 * m8 - m5 * m7 ) - m1 * ( m3 * m8 - m5 * m6 ) + m2 * ( m3 * m7 - m4 * m6 );
+	}
 
-    @:extern public inline function determinant(): Float
-    {
-        var c00 = cofactor(_11, _21, _31, _12, _22, _32, _13, _23, _33);
-        var c01 = cofactor(_10, _20, _30, _12, _22, _32, _13, _23, _33);
-        var c02 = cofactor(_10, _20, _30, _11, _21, _31, _13, _23, _33);
-        var c03 = cofactor(_10, _20, _30, _11, _21, _31, _12, _22, _32);
-        return _00 * c00 - _01 * c01 + _02 * c02 - _03 * c03;
-    }
+	@:extern public inline function determinant(): Float {
+		var c00 = cofactor(_11, _21, _31, _12, _22, _32, _13, _23, _33);
+		var c01 = cofactor(_10, _20, _30, _12, _22, _32, _13, _23, _33);
+		var c02 = cofactor(_10, _20, _30, _11, _21, _31, _13, _23, _33);
+		var c03 = cofactor(_10, _20, _30, _11, _21, _31, _12, _22, _32);
+		return _00 * c00 - _01 * c01 + _02 * c02 - _03 * c03;
+	}
 
-    @:extern public inline function inverse(): Matrix4
-    {
-        var c00 = cofactor(_11, _21, _31, _12, _22, _32, _13, _23, _33);
-        var c01 = cofactor(_10, _20, _30, _12, _22, _32, _13, _23, _33);
-        var c02 = cofactor(_10, _20, _30, _11, _21, _31, _13, _23, _33);
-        var c03 = cofactor(_10, _20, _30, _11, _21, _31, _12, _22, _32);
+	@:extern public inline function inverse(): Matrix4 {
+		var c00 = cofactor(_11, _21, _31, _12, _22, _32, _13, _23, _33);
+		var c01 = cofactor(_10, _20, _30, _12, _22, _32, _13, _23, _33);
+		var c02 = cofactor(_10, _20, _30, _11, _21, _31, _13, _23, _33);
+		var c03 = cofactor(_10, _20, _30, _11, _21, _31, _12, _22, _32);
 
-        var det:Float = _00 * c00 - _01 * c01 + _02 * c02 - _03 * c03;
-        if( Math.abs(det) < 0.000001 )
+		var det: Float = _00 * c00 - _01 * c01 + _02 * c02 - _03 * c03;
+		if (Math.abs(det) < 0.000001) {
             throw "determinant is too small";
+		}
 
-        var c10 = cofactor(_01, _21, _31, _02, _22, _32, _03, _23, _33);
-        var c11 = cofactor(_00, _20, _30, _02, _22, _32, _03, _23, _33);
-        var c12 = cofactor(_00, _20, _30, _01, _21, _31, _03, _23, _33);
-        var c13 = cofactor(_00, _20, _30, _01, _21, _31, _02, _22, _32);
+		var c10 = cofactor(_01, _21, _31, _02, _22, _32, _03, _23, _33);
+		var c11 = cofactor(_00, _20, _30, _02, _22, _32, _03, _23, _33);
+		var c12 = cofactor(_00, _20, _30, _01, _21, _31, _03, _23, _33);
+		var c13 = cofactor(_00, _20, _30, _01, _21, _31, _02, _22, _32);
 
-        var c20 = cofactor(_01, _11, _31, _02, _12, _32, _03, _13, _33);
-        var c21 = cofactor(_00, _10, _30, _02, _12, _32, _03, _13, _33);
-        var c22 = cofactor(_00, _10, _30, _01, _11, _31, _03, _13, _33);
-        var c23 = cofactor(_00, _10, _30, _01, _11, _31, _02, _12, _32);
+		var c20 = cofactor(_01, _11, _31, _02, _12, _32, _03, _13, _33);
+		var c21 = cofactor(_00, _10, _30, _02, _12, _32, _03, _13, _33);
+		var c22 = cofactor(_00, _10, _30, _01, _11, _31, _03, _13, _33);
+		var c23 = cofactor(_00, _10, _30, _01, _11, _31, _02, _12, _32);
 
-        var c30 = cofactor(_01, _11, _21, _02, _12, _22, _03, _13, _23);
-        var c31 = cofactor(_00, _10, _20, _02, _12, _22, _03, _13, _23);
-        var c32 = cofactor(_00, _10, _20, _01, _11, _21, _03, _13, _23);
-        var c33 = cofactor(_00, _10, _20, _01, _11, _21, _02, _12, _22);
+		var c30 = cofactor(_01, _11, _21, _02, _12, _22, _03, _13, _23);
+		var c31 = cofactor(_00, _10, _20, _02, _12, _22, _03, _13, _23);
+		var c32 = cofactor(_00, _10, _20, _01, _11, _21, _03, _13, _23);
+		var c33 = cofactor(_00, _10, _20, _01, _11, _21, _02, _12, _22);
 
-        var invdet:Float = 1.0 / det;
-        return new Matrix4(
-              c00 * invdet, - c01 * invdet,   c02 * invdet, - c03 * invdet,
-            - c10 * invdet,   c11 * invdet, - c12 * invdet,   c13 * invdet,
-              c20 * invdet, - c21 * invdet,   c22 * invdet, - c23 * invdet,
-            - c30 * invdet,   c31 * invdet, - c32 * invdet,   c33 * invdet
-        );
-    }
+		var invdet: Float = 1.0 / det;
+		return new Matrix4(
+			 c00 * invdet, - c01 * invdet,   c02 * invdet, - c03 * invdet,
+			-c10 * invdet,   c11 * invdet, - c12 * invdet,   c13 * invdet,
+			 c20 * invdet, - c21 * invdet,   c22 * invdet, - c23 * invdet,
+			-c30 * invdet,   c31 * invdet, - c32 * invdet,   c33 * invdet
+		);
+	}
 }

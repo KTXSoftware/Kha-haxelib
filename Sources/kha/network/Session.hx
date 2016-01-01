@@ -10,6 +10,7 @@ import js.Browser;
 import js.html.BinaryType;
 import js.html.WebSocket;
 #end
+import kha.System;
 
 class State {
 	public var time: Float;
@@ -25,6 +26,7 @@ class Session {
 	public static inline var START = 0;
 	public static inline var ENTITY_UPDATES = 1;
 	public static inline var CONTROLLER_UPDATES = 2;
+	public static inline var REMOTE_CALL = 3;
 	
 	private static var instance: Session = null;
 	private var entities: Map<Int, Entity> = new Map();
@@ -66,11 +68,12 @@ class Session {
 	}
 	
 	public function addController(controller: Controller): Void {
+		trace("Adding controller id " + controller._id());
 		controllers.set(controller._id(), controller);
 	}
 	
+	#if sys_server
 	private function send(): Bytes {
-		#if sys_server
 		var size = 0;
 		for (entity in entities) {
 			size += entity._size();
@@ -92,48 +95,49 @@ class Session {
 		}
 		
 		return bytes;
-		#else
-		/*var size = 0;
-		for (controller in controllers) {
-			size += controller._size();
-		}
-		var offset = 0;
-		var bytes = Bytes.alloc(size + 1);
-		bytes.set(0, CONTROLLER_UPDATES);
-		offset += 1;
-		for (controller in controllers) {
-			controller._send(offset, bytes);
-			offset += controller._size();
-		}
-		return bytes;*/
-		return null;
-		#end
 	}
+	#end
 	
-	public function receive(bytes: Bytes): Void {
+	public function receive(bytes: Bytes, client: Client = null): Void {
 		#if sys_server
+		
 		switch (bytes.get(0)) {
 		case CONTROLLER_UPDATES:
 			var id = bytes.getInt32(1);
 			var time = bytes.getDouble(5);
-			Scheduler.addTimeTask(function () { controllers[id]._receive(13, bytes); }, time - Scheduler.time());
-			if (time < Scheduler.time()) {
-				var i = lastStates.length - 1;
-				while (i >= 0) {
-					if (lastStates[i].time < time) {
-						var offset = 9;
-						for (entity in entities) {
-							entity._receive(offset, lastStates[i].data);
-							offset += entity._size();
+			
+			var width = bytes.getInt32(13);
+			var height = bytes.getInt32(17);
+			var rotation = bytes.get(21);
+			SystemImpl._updateSize(width, height);
+			SystemImpl._updateScreenRotation(rotation);
+			
+			if (controllers.exists(id)) {
+				Scheduler.addTimeTask(function () {
+					current = client;
+					controllers[id]._receive(22, bytes);
+					current = null;					
+				}, time - Scheduler.time());
+				if (time < Scheduler.time()) {
+					var i = lastStates.length - 1;
+					while (i >= 0) {
+						if (lastStates[i].time < time) {
+							var offset = 9;
+							for (entity in entities) {
+								entity._receive(offset, lastStates[i].data);
+								offset += entity._size();
+							}
+							Scheduler.back(time);
+							break;
 						}
-						Scheduler.back(time);
-						break;
+						--i;
 					}
-					--i;
 				}
 			}
 		}
+		
 		#else
+		
 		switch (bytes.get(0)) {
 		case START:
 			var index = bytes.get(1);
@@ -148,13 +152,69 @@ class Session {
 				offset += entity._size();
 			}
 			Scheduler.back(time);
+		case REMOTE_CALL:
+			var args = new Array<Dynamic>();
+			var index: Int = 1;
+			
+			var classnamelength = bytes.getUInt16(index);
+			index += 2;
+			var classname = "";
+			for (i in 0...classnamelength) {
+				classname += String.fromCharCode(bytes.get(index));
+				++index;
+			}
+			
+			var methodnamelength = bytes.getUInt16(index);
+			index += 2;
+			var methodname = "";
+			for (i in 0...methodnamelength) {
+				methodname += String.fromCharCode(bytes.get(index));
+				++index;
+			}
+			
+			while (index < bytes.length) {
+				var type = bytes.get(index);
+				++index;
+				switch (type) {
+				case 0x42: // B
+					var value: Bool = bytes.get(index) == 1;
+					++index;
+					trace("Bool: " + value);
+					args.push(value);
+				case 0x46: // F
+					var value: Float = bytes.getDouble(index);
+					index += 8;
+					trace("Float: " + value);
+					args.push(value);
+				case 0x49: // I
+					var value: Int = bytes.getInt32(index);
+					index += 4;
+					trace("Int: " + value);
+					args.push(value);
+				case 0x53: // S
+					var length = bytes.getUInt16(index);
+					index += 2;
+					var str = "";
+					for (i in 0...length) {
+						str += String.fromCharCode(bytes.get(index));
+						++index;
+					}
+					trace("String: " + str);
+					args.push(str);
+				default:
+					trace("Unknown argument type.");
+				}
+			}
+			Reflect.callMethod(null, Reflect.field(Type.resolveClass(classname), methodname + "_remotely"), args);
 		}
+		
 		#end
 	}
 	
 	public function waitForStart(callback: Void->Void): Void {
 		startCallback = callback;
 		#if sys_server
+		trace("Starting server at 6789.");
 		server = new Server(6789);
 		server.onConnection(function (client: Client) {
 			clients.push(client);
@@ -163,8 +223,7 @@ class Session {
 			Node.console.log(clients.length + " client" + (clients.length > 1 ? "s " : " ") + "connected.");
 			
 			client.receive(function (bytes: Bytes) {
-				current = client;
-				receive(bytes);
+				receive(bytes, client);
 			});
 			
 			client.onClose(function () {
@@ -176,6 +235,7 @@ class Session {
 				Node.console.log("Starting game.");
 				var index = 0;
 				for (c in clients) {
+					trace("Starting client " + c.id);
 					var bytes = Bytes.alloc(2);
 					bytes.set(0, START);
 					bytes.set(1, index);
@@ -188,7 +248,7 @@ class Session {
 		});
 		#else
 		network = new Network("localhost", 6789);
-		network.listen(receive);
+		network.listen(function (bytes: Bytes) { receive(bytes); } );
 		#end
 	}
 	
@@ -197,8 +257,14 @@ class Session {
 		for (client in clients) {
 			client.send(send(), false);
 		}
-		#else
-		//network.send(send(), false);
 		#end
 	}
+	
+	#if sys_server
+	public function sendToEverybody(bytes: Bytes): Void {
+		for (client in clients) {
+			client.send(bytes, false);
+		}
+	}
+	#end
 }

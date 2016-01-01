@@ -10,7 +10,7 @@ class ExporterMakefile extends Exporter {
 		super();
 	}
 
-	exportSolution(solution, from, to, platform) {
+	exportSolution(solution, from, to, platform, vrApi, nokrafix, options) {
 		let project = solution.getProjects()[0];
 
 		let objects = {};
@@ -48,7 +48,7 @@ class ExporterMakefile extends Exporter {
 		}
 		this.p('INC=' + incline);
 
-		let libsline = '-pthread -lGL -lX11 -lasound -ldl';
+		let libsline = '-static-libgcc -static-libstdc++ -pthread -lGL -lX11 -lasound -ldl';
 		this.p('LIB=' + libsline);
 
 		let defline = '';
@@ -58,8 +58,11 @@ class ExporterMakefile extends Exporter {
 		this.p('DEF=' + defline);
 		this.p();
 
+		let optimization = '';
+		if (!options.debug) optimization = '-O3';
+
 		this.p(project.getName() + ': ' + ofilelist);
-		this.p('\tg++ ' + ofilelist + ' -o "' + project.getName() + '" $(LIB)');
+		this.p('\tg++ -std=c++0x ' + optimization + ' ' + ofilelist + ' -o "' + project.getName() + '" $(LIB)');
 
 		for (let file of project.getFiles()) {
 			if (file.endsWith('.c') || file.endsWith('.cpp') || file.endsWith('cc')) {
@@ -67,7 +70,7 @@ class ExporterMakefile extends Exporter {
 				let name = ofiles[file];
 				let realfile = to.relativize(from.resolve(file));
 				this.p(name + '.o: ' + realfile);
-				this.p('\tg++ $(INC) $(DEF) -c ' + realfile + ' -o ' + name + '.o $(LIB)');
+				this.p('\tg++ -std=c++0x ' + optimization + ' $(INC) $(DEF) -c ' + realfile + ' -o ' + name + '.o $(LIB)');
 			}
 		}
 

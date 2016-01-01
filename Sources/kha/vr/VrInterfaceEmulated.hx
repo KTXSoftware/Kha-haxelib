@@ -1,13 +1,12 @@
 package kha.vr;
 
 import kha.arrays.Float32Array;
-import kha.Button;
 import kha.graphics4.FragmentShader;
 import kha.graphics4.Graphics;
 import kha.Framebuffer;
 import kha.graphics4.ConstantLocation;
 import kha.graphics4.IndexBuffer;
-import kha.graphics4.Program;
+import kha.graphics4.PipelineState;
 import kha.graphics4.TextureUnit;
 import kha.graphics4.Usage;
 import kha.graphics4.VertexBuffer;
@@ -15,11 +14,13 @@ import kha.graphics4.VertexShader;
 import kha.graphics4.VertexStructure;
 import kha.graphics4.VertexData;
 import kha.input.Keyboard;
+import kha.math.FastMatrix4;
 import kha.math.Matrix4;
 import kha.math.Quaternion;
 import kha.math.Vector4;
 import kha.math.Vector3;
 import kha.math.Vector2;
+import kha.Shaders;
 import kha.vr.Pose;
 import kha.vr.PoseState;
 import kha.vr.SensorState;
@@ -125,7 +126,7 @@ class VrInterfaceEmulated extends kha.vr.VrInterface {
 	private var oldMouseX: Int = 0;
 	private var oldMouseY: Int = 0;
 	
-	private function mouseMoveEvent(x: Int, y: Int) {
+	private function mouseMoveEvent(x: Int, y: Int, movementX : Int, movementY : Int) {
 		if (!mouseButtonDown) return;
 		
 		var mouseDeltaX: Int = x - oldMouseX;
@@ -211,13 +212,13 @@ class VrInterfaceEmulated extends kha.vr.VrInterface {
 		
 		var g: Graphics = framebuffer.g4;
 		g.begin();
-		g.setProgram(program);
+		g.setPipeline(pipeline);
 		g.setVertexBuffer(vb);
 		g.setIndexBuffer(ib);
-		var matrixLocation: ConstantLocation = program.getConstantLocation("projectionMatrix");
-		var p: Matrix4 = Matrix4.identity();
+		var matrixLocation: ConstantLocation = pipeline.getConstantLocation("projectionMatrix");
+		var p: FastMatrix4 = FastMatrix4.identity();
 		g.setMatrix(matrixLocation, p);
-		var texture: TextureUnit = program.getTextureUnit("tex");
+		var texture: TextureUnit = pipeline.getTextureUnit("tex");
 		
 		g.setTexture(texture, parms.RightImage.Image);
 		g.drawIndexedVertices();
@@ -236,14 +237,14 @@ class VrInterfaceEmulated extends kha.vr.VrInterface {
 	
 	public override function GetTimeInSeconds(): Float {
 		// TODO: Is it in seconds?
-		return Sys.getTime();
+		return System.time;
 	}
 	
 	
 	var vb: VertexBuffer;
 	var ib: IndexBuffer;
 	
-	var program: Program;
+	var pipeline: PipelineState;
 	
 	private function setVertex(a: Float32Array, index: Int, pos: Vector3, uv: Vector2, color: Vector4) {
 		var base: Int = index * 9;
@@ -302,14 +303,11 @@ class VrInterfaceEmulated extends kha.vr.VrInterface {
 		
 		ib.unlock(); 
 		
-		program = new Program();
+		pipeline = new PipelineState();
 		
-		program.setVertexShader(new VertexShader(Loader.the.getShader("painter-image.vert")));
-		program.setFragmentShader(new FragmentShader(Loader.the.getShader("painter-image.frag")));
-		program.link(structure);
-		
-		
+		pipeline.vertexShader = Shaders.painter_image_vert;
+		pipeline.fragmentShader = Shaders.painter_image_frag;
+		pipeline.inputLayout = [structure];
+		pipeline.compile();
 	}
-	
 }
-

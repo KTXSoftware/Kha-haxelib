@@ -3,9 +3,9 @@
 	"url" : "https://github.com/KTXSoftware/Kha",
 	"license": "MIT",
 	"tags": ["cross", "game"],
-	"description": "Ultra portable game/media-app framework",
-	"version": "15.10.0",
-	"releasenote": "Updated to revision d24ed325c69406b6384f04e52efc8ed322c76237.",
+	"description": "Portable multimedia framework",
+	"version": "16.1.0",
+	"releasenote": "Updated to revision 849a0a58a7f6ce6ea96f79c58fcf0eeb237f8e99.",
 	"contributors": ["RobDangerous"],
 	"dependencies": { }
 }

@@ -7,18 +7,18 @@ namespace Kore {
 	
 	class VertexBufferImpl {
 	protected:
-		VertexBufferImpl(int count);
+		VertexBufferImpl(int count, int instanceDataStepRate);
 		void unset();
 		float* data;
 		int myCount;
 		int myStride;
-		uint arrayId;
 		uint bufferId;
-#if defined SYS_ANDROID || defined SYS_HTML5 || defined SYS_TIZEN
+//#if defined SYS_ANDROID || defined SYS_HTML5 || defined SYS_TIZEN
 		VertexStructure structure;
-#endif
+//#endif
+		int instanceDataStepRate;
+		int setVertexAttributes(int offset);
 	public:
 		static VertexBuffer* current;
 	};
 }
-

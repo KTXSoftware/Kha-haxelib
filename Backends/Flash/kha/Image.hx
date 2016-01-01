@@ -4,7 +4,6 @@ import flash.utils.ByteArray;
 import haxe.io.Bytes;
 import kha.graphics4.TextureFormat;
 import kha.graphics4.Usage;
-import kha.Starter;
 import flash.display.Bitmap;
 import flash.display.BitmapData;
 import flash.display.DisplayObject;
@@ -30,7 +29,7 @@ class Image implements Canvas implements Resource {
 	private var graphics4: kha.graphics4.Graphics;
 	
 	public static function create(width: Int, height: Int, format: TextureFormat = null, usage: Usage = null, levels: Int = 1): Image {
-		return new Image(width, height, format == null ? TextureFormat.RGBA32 : format, false, false, false);
+		return new Image(width, height, format == null ? TextureFormat.RGBA32 : format, false, false, usage == Usage.ReadableUsage);
 	}
 	
 	public static function createRenderTarget(width: Int, height: Int, format: TextureFormat = null, depthStencil: Bool = false, antiAliasingSamples: Int = 1): Image {
@@ -45,7 +44,7 @@ class Image implements Canvas implements Resource {
 		this.format = format;
 		this.depthStencil = depthStencil;
 		this.readable = readable;
-		tex = Starter.context.createTexture(texWidth, texHeight, format == TextureFormat.RGBA128 ? Context3DTextureFormat.RGBA_HALF_FLOAT : Context3DTextureFormat.BGRA, renderTarget);
+		tex = SystemImpl.context.createTexture(texWidth, texHeight, format == TextureFormat.RGBA128 ? Context3DTextureFormat.RGBA_HALF_FLOAT : Context3DTextureFormat.BGRA, renderTarget);
 	}
 	
 	public static function fromBitmap(image: DisplayObject, readable: Bool): Image {
@@ -162,13 +161,15 @@ class Image implements Canvas implements Resource {
 	}
 	
 	public function lock(level: Int = 0): Bytes {
-		switch (format) {
-			case RGBA32:
-				bytes = Bytes.alloc(texWidth * texHeight * 4);
-			case L8:
-				bytes = Bytes.alloc(texWidth * texHeight);
-			case RGBA128:
-				bytes = Bytes.alloc(texWidth * texHeight * 16);
+		if (bytes == null) {
+			switch (format) {
+				case RGBA32:
+					bytes = Bytes.alloc(texWidth * texHeight * 4);
+				case L8:
+					bytes = Bytes.alloc(texWidth * texHeight);
+				case RGBA128:
+					bytes = Bytes.alloc(texWidth * texHeight * 16);
+			}
 		}
 		return bytes;
 	}

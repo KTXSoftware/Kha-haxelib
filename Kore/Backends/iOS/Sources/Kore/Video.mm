@@ -107,12 +107,16 @@ Video::~Video() {
 	stop();
 }
 
+void iosPlayVideoSoundStream(VideoSoundStream* video);
+void iosStopVideoSoundStream();
+
 void Video::play() {
 	AVAssetReader* reader = assetReader;
 	[reader startReading];
 	
 	sound = new VideoSoundStream(2, 44100);
-	Mixer::play(sound);
+	//Mixer::play(sound);
+	iosPlayVideoSoundStream(sound);
 	
 	playing = true;
 	start = System::time() - videoStart;
@@ -121,7 +125,8 @@ void Video::play() {
 void Video::pause() {
 	playing = false;
 	if (sound != nullptr) {
-		Mixer::stop(sound);
+		//Mixer::stop(sound);
+        iosStopVideoSoundStream();
 		delete sound;
 		sound = nullptr;
 	}

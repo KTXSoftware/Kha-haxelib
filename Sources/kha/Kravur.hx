@@ -1,21 +1,10 @@
 package kha;
 
+import haxe.ds.Vector;
+import haxe.io.Bytes;
+import kha.graphics2.truetype.StbTruetype;
 import kha.graphics4.TextureFormat;
 import kha.graphics4.Usage;
-
-class BakedChar {
-	public function new() { }
-	
-	// coordinates of bbox in bitmap
-	public var x0: Int;
-	public var y0: Int;
-	public var x1: Int;
-	public var y1: Int;
-   
-	public var xoff: Float;
-	public var yoff: Float;
-	public var xadvance: Float;
-}
 
 class AlignedQuad {
 	public function new() { }
@@ -35,87 +24,32 @@ class AlignedQuad {
 	public var xadvance: Float;
 }
 
-class Kravur implements Font {
-	private var myName: String;
-	private var myStyle: FontStyle;
+class KravurImage {
 	private var mySize: Float;
 	
-	private var chars: Array<BakedChar>;
+	private var chars: Vector<Stbtt_bakedchar>;
 	private var texture: Image;
 	public var width: Int;
 	public var height: Int;
 	private var baseline: Float;
 	
-	private static var fontCache: Map<String, Kravur> = new Map();
-	/**
-		Returns the cached Kravur for name, style and size or loads it.
-	**/
-	public static function get(name: String, style: FontStyle, size: Float) : Kravur {
-		var key = name;
-		if (style.getBold()) {
-			key += "#Bold";
-		}
-		if (style.getItalic()) {
-			key += "#Italic";
-		}
-		key += size + ".kravur";
-		
-		var kravur = fontCache.get(key);
-		if (kravur == null) {
-			var blob = Loader.the.getBlob(key);
-			if (blob != null) {
-				kravur = new Kravur(blob);
-				kravur.myName = name;
-				kravur.myStyle = style;
-				kravur.mySize = size;
-				
-				fontCache.set(key, kravur);
-			}
-		}
-		return kravur;
-	}
-	
-	private function new(blob: Blob) {
-		var size = blob.readS32LE();
-		var ascent = blob.readS32LE();
-		var descent = blob.readS32LE();
-		var lineGap = blob.readS32LE();
+	public function new(size: Int, ascent: Int, descent: Int, lineGap: Int, width: Int, height: Int, chars: Vector < Stbtt_bakedchar > , pixels: Blob) {
+		mySize = size;
+		this.width = width;
+		this.height = height;
+		this.chars = chars;
 		baseline = ascent;
-		chars = new Array<BakedChar>();
-		for (i in 0...256 - 32) {
-			var char = new BakedChar();
-			char.x0 = blob.readS16LE();
-			char.y0 = blob.readS16LE();
-			char.x1 = blob.readS16LE();
-			char.y1 = blob.readS16LE();
-			char.xoff = blob.readF32LE();
-			char.yoff = blob.readF32LE() + baseline;
-			char.xadvance = blob.readF32LE();
-			chars.push(char);
+		for (char in chars) {
+			char.yoff += baseline;
 		}
-		width = blob.readS32LE();
-		height = blob.readS32LE();
-		var w = width;
-		var h = height;
-		while (w > Image.maxSize || h > Image.maxSize) {
-			blob.seek(blob.position + h * w);
-			w = Std.int(w / 2);
-			h = Std.int(h / 2);
-		}
-		texture = Image.create(w, h, TextureFormat.L8);
+		texture = Image.create(width, height, TextureFormat.L8);
 		var bytes = texture.lock();
 		var pos: Int = 0;
-		for (y in 0...h) for (x in 0...w) {
-			bytes.set(pos, blob.readU8());
-			
-			//filter-test
-			//if ((x + y) % 2 == 0) bytes.set(pos, 0xff);
-			//else bytes.set(pos, 0);
-			
+		for (y in 0...height) for (x in 0...width) {
+			bytes.set(pos, pixels.readU8(pos));
 			++pos;
 		}
 		texture.unlock();
-		blob.reset();
 	}
 	
 	public function getTexture(): Image {
@@ -153,32 +87,8 @@ class Kravur implements Font {
 		return chars[charIndex - 32].xadvance;
 	}
 	
-	public var name(get, null): String;
-	public var style(get, null): FontStyle;
-	public var size(get, null): Float;
-	
-	public function get_name(): String {
-		return myName;
-	}
-	
-	public function get_style(): FontStyle {
-		return myStyle;
-	}
-	
-	public function get_size(): Float {
-		return mySize;
-	}
-	
 	public function getHeight(): Float {
 		return mySize;
-	}
-	
-	public function charWidth(ch: String): Float {
-		return getCharWidth(ch.charCodeAt(0));
-	}
-
-	public function charsWidth(ch: String, offset: Int, length: Int): Float {
-		return stringWidth(ch.substr(offset, length));
 	}
 	
 	public function stringWidth(string: String): Float {
@@ -187,15 +97,73 @@ class Kravur implements Font {
 		for (c in 0...str.length) {
 			width += getCharWidth(str.charCodeAt(c));
 		}
-		//trace("width: " + width);
-		if (width > 10 && width < 100) {
-			var a = 3;
-			++a;
-		}
 		return width;
 	}
 	
 	public function getBaselinePosition(): Float {
 		return baseline;
+	}
+}
+
+class Kravur implements Font {
+	private var blob: Blob;
+	private var images: Map<Int, KravurImage> = new Map();
+	
+	public function new(blob: Blob) {
+		this.blob = blob;
+	}
+	
+	public function _get(fontSize: Int): KravurImage {
+		if (!images.exists(fontSize)) {
+			var width: Int = 64;
+			var height: Int = 32;
+			var baked = new Vector<Stbtt_bakedchar>(256 - 32);
+			for (i in 0...baked.length) {
+				baked[i] = new Stbtt_bakedchar();
+			}
+
+			var pixels: Blob = null;
+
+			var status: Int = -1;
+			while (status < 0) {
+				if (height < width) height *= 2;
+				else width *= 2;
+				pixels = Blob.alloc(width * height);
+				status = StbTruetype.stbtt_BakeFontBitmap(blob, 0, fontSize, pixels, width, height, 32, 256 - 32, baked);
+			}
+			
+			// TODO: Scale pixels down if they exceed the supported texture size
+			
+			var info = new Stbtt_fontinfo();
+			StbTruetype.stbtt_InitFont(info, blob, 0);
+
+			var metrics = StbTruetype.stbtt_GetFontVMetrics(info);
+			var scale = StbTruetype.stbtt_ScaleForPixelHeight(info, fontSize);
+			var ascent = Math.round(metrics.ascent * scale); // equals baseline
+			var descent = Math.round(metrics.descent * scale);
+			var lineGap = Math.round(metrics.lineGap * scale);
+			
+			var image = new KravurImage(Std.int(fontSize), ascent, descent, lineGap, width, height, baked, pixels);
+			images[fontSize] = image;
+			return image;
+		}
+		return images[fontSize];
+	}
+
+	public function height(fontSize: Int): Float {
+		return _get(fontSize).getHeight();
+	}
+
+	public function width(fontSize: Int, str: String): Float {
+		return _get(fontSize).stringWidth(str);
+	}
+	
+	public function baseline(fontSize: Int): Float {
+		return _get(fontSize).getBaselinePosition();
+	}
+	
+	public function unload(): Void {
+		blob = null;
+		images = null;
 	}
 }

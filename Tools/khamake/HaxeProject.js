@@ -22,7 +22,7 @@ function IntelliJ(projectdir, options) {
 			sources += '      <sourceFolder url="file://' + options.sources[i] + '" isTestSource="false" />\n';
 		}
 		else {
-			sources += '      <sourceFolder url="file://$MODULE_DIR$/' + path.relative(outdir, path.join(options.from, options.sources[i])).replaceAll('\\', '/') + '" isTestSource="false" />\n';
+			sources += '      <sourceFolder url="file://$MODULE_DIR$/' + path.relative(outdir, path.resolve(options.from, options.sources[i])).replaceAll('\\', '/') + '" isTestSource="false" />\n';
 		}
 	}
 
@@ -32,6 +32,9 @@ function IntelliJ(projectdir, options) {
     for (let i = 0; i < options.defines.length; ++i) {
 		defines += options.defines[i];
 		if (i < options.defines.length - 1) defines += ',';
+	}
+	for (let param of options.parameters) {
+		defines += param + ',';
 	}
 
 	let target;
@@ -79,7 +82,7 @@ function hxml(projectdir, options) {
 			data += '-cp ' + options.sources[i] + '\n';
 		}
 		else {
-			data += '-cp ' + path.relative(projectdir, path.join(options.from, options.sources[i])) + '\n'; // from.resolve('build').relativize(from.resolve(this.sources[i])).toString());
+			data += '-cp ' + path.relative(projectdir, path.resolve(options.from, options.sources[i])) + '\n'; // from.resolve('build').relativize(from.resolve(this.sources[i])).toString());
 		}
 	}
 	for (let d in options.defines) {
@@ -107,6 +110,9 @@ function hxml(projectdir, options) {
 	else if (options.language === 'as') {
 		data += '-swf ' + path.normalize(options.to) + '\n';
 		data += '-swf-version 16.0\n';
+	}
+	for (let param of options.parameters) {
+		data += param + '\n';
 	}
 	data += '-main Main' + '\n';
 	fs.outputFileSync(path.join(projectdir, 'project-' + options.system + '.hxml'), data);
@@ -203,7 +209,7 @@ function FlashDevelop(projectdir, options) {
 		else {
 			classpaths.e.push({
 				n: 'class',
-				path: path.relative(projectdir, path.join(options.from, options.sources[i]))
+				path: path.relative(projectdir, path.resolve(options.from, options.sources[i]))
 			});
 		}
 	}
@@ -261,6 +267,10 @@ function FlashDevelop(projectdir, options) {
 	}
 	if (options.language === 'cs' && fs.existsSync(options.haxeDirectory) && fs.statSync(options.haxeDirectory).isDirectory() && fs.existsSync(path.join(options.haxeDirectory, 'netlib'))) {
 		def += '-net-std ' + path.relative(projectdir, path.join(options.haxeDirectory, 'netlib')) + '&#xA;';
+	}
+	def += '-D kha_output=\\&quot;' + path.resolve(path.join('build', options.to)) + '\\&quot;';
+	for (let param of options.parameters) {
+		def += param + '&#xA;';
 	}
 
 	let project = {
