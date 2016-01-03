@@ -4,8 +4,8 @@
 	"license": "MIT",
 	"tags": ["cross", "game"],
 	"description": "Portable multimedia framework",
-	"version": "16.1.0",
-	"releasenote": "Updated to revision 849a0a58a7f6ce6ea96f79c58fcf0eeb237f8e99.",
+	"version": "16.1.1",
+	"releasenote": "Updated to revision 05b54901a56e054f5bdef2df42775af1852545de.",
 	"contributors": ["RobDangerous"],
 	"dependencies": { }
 }
